@@ -1,0 +1,189 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum LeadStatus {
+  NEW
+  INTERESTED
+  FOLLOW_UP
+  WON
+  LOST
+  HUMAN_REQUIRED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  HUMAN
+  SYSTEM
+}
+
+enum PredefinedResponseMatchType {
+  KEYWORD
+  INTENT
+  DEFAULT
+}
+
+model Tenant {
+  id              String       @id @default(uuid())
+  name            String
+  businessType    String
+  whatsappPhoneId String       @unique
+  status          TenantStatus @default(ACTIVE)
+
+  agentConfig   AgentConfig?
+  leads         Lead[]
+  conversations Conversation[]
+  usageDaily    UsageDaily[]
+
+  predefinedResponses PredefinedResponse[]
+  knowledgeItems      KnowledgeItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AgentConfig {
+  id       String @id @default(uuid())
+  tenantId String @unique
+
+  tone              String
+  objective         String
+  businessInfo      String
+  services          String
+  fixedRules        String
+  humanHandoffRules String
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Lead {
+  id       String     @id @default(uuid())
+  tenantId String
+  phone    String
+  name     String?
+  interest String?
+  status   LeadStatus @default(NEW)
+  score    Int        @default(0)
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, phone])
+  @@index([tenantId])
+  @@index([tenantId, status])
+}
+
+model Conversation {
+  id       String @id @default(uuid())
+  tenantId String
+  leadId   String
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lead     Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([leadId])
+}
+
+model Message {
+  id             String      @id @default(uuid())
+  conversationId String
+  role           MessageRole
+  content        String
+  externalId     String?     @unique
+  tokensInput    Int         @default(0)
+  tokensOutput   Int         @default(0)
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([conversationId])
+  @@index([createdAt])
+}
+
+model UsageDaily {
+  id       String   @id @default(uuid())
+  tenantId String
+  date     DateTime
+
+  inboundMessages Int     @default(0)
+  aiResponses     Int     @default(0)
+  tokensInput     Int     @default(0)
+  tokensOutput    Int     @default(0)
+  estimatedCost   Decimal @default(0)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, date])
+  @@index([tenantId])
+}
+
+model PredefinedResponse {
+  id            String                      @id @default(uuid())
+  tenantId      String
+  name          String
+  matchType     PredefinedResponseMatchType @default(KEYWORD)
+  keywords      String[]                    @default([])
+  intent        String?
+  response      String
+  priority      Int                         @default(100)
+  isActive      Boolean                     @default(true)
+  requiresHuman Boolean                     @default(false)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, isActive])
+  @@index([tenantId, matchType])
+}
+
+model KnowledgeItem {
+  id       String @id @default(uuid())
+  tenantId String
+
+  title    String
+  content  String
+  category String?
+  isActive Boolean @default(true)
+  priority Int     @default(100)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, isActive])
+  @@index([tenantId, category])
+}
