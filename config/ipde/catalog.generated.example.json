@@ -1,0 +1,173 @@
+{
+  "schemaVersion": 1,
+  "id": "MATERIA_GENERADA_DEMOSTRATIVA",
+  "tenantCode": "IPDE",
+  "category": "OTROS",
+  "displayName": "Materia Generada Demostrativa",
+  "normalizedName": "materia generada demostrativa",
+  "aliases": ["Ejemplo Generado No Comercial"],
+  "allowedProductTypes": ["CURSO_CAPACITACION"],
+  "topics": [
+    {
+      "id": "TEMA_GENERADO_01",
+      "name": "Tema generado ficticio 01",
+      "active": true,
+      "priority": 1
+    },
+    {
+      "id": "TEMA_GENERADO_02",
+      "name": "Tema generado ficticio 02",
+      "active": true,
+      "priority": 2
+    },
+    {
+      "id": "TEMA_GENERADO_03",
+      "name": "Tema generado ficticio 03",
+      "active": true,
+      "priority": 3
+    },
+    {
+      "id": "TEMA_GENERADO_04",
+      "name": "Tema generado ficticio 04",
+      "active": true,
+      "priority": 4
+    },
+    {
+      "id": "TEMA_GENERADO_05",
+      "name": "Tema generado ficticio 05",
+      "active": true,
+      "priority": 5
+    },
+    {
+      "id": "TEMA_GENERADO_06",
+      "name": "Tema generado ficticio 06",
+      "active": true,
+      "priority": 6
+    },
+    {
+      "id": "TEMA_GENERADO_07",
+      "name": "Tema generado ficticio 07",
+      "active": true,
+      "priority": 7
+    },
+    {
+      "id": "TEMA_GENERADO_08",
+      "name": "Tema generado ficticio 08",
+      "active": true,
+      "priority": 8
+    },
+    {
+      "id": "TEMA_GENERADO_09",
+      "name": "Tema generado ficticio 09",
+      "active": true,
+      "priority": 9
+    },
+    {
+      "id": "TEMA_GENERADO_10",
+      "name": "Tema generado ficticio 10",
+      "active": true,
+      "priority": 10
+    },
+    {
+      "id": "TEMA_GENERADO_11",
+      "name": "Tema generado ficticio 11",
+      "active": true,
+      "priority": 11
+    },
+    {
+      "id": "TEMA_GENERADO_12",
+      "name": "Tema generado ficticio 12",
+      "active": true,
+      "priority": 12
+    },
+    {
+      "id": "TEMA_GENERADO_13",
+      "name": "Tema generado ficticio 13",
+      "active": true,
+      "priority": 13
+    },
+    {
+      "id": "TEMA_GENERADO_14",
+      "name": "Tema generado ficticio 14",
+      "active": true,
+      "priority": 14
+    },
+    {
+      "id": "TEMA_GENERADO_15",
+      "name": "Tema generado ficticio 15",
+      "active": true,
+      "priority": 15
+    },
+    {
+      "id": "TEMA_GENERADO_16",
+      "name": "Tema generado ficticio 16",
+      "active": true,
+      "priority": 16
+    },
+    {
+      "id": "TEMA_GENERADO_17",
+      "name": "Tema generado ficticio 17",
+      "active": true,
+      "priority": 17
+    },
+    {
+      "id": "TEMA_GENERADO_18",
+      "name": "Tema generado ficticio 18",
+      "active": true,
+      "priority": 18
+    },
+    {
+      "id": "TEMA_GENERADO_19",
+      "name": "Tema generado ficticio 19",
+      "active": true,
+      "priority": 19
+    },
+    {
+      "id": "TEMA_GENERADO_20",
+      "name": "Tema generado ficticio 20",
+      "active": true,
+      "priority": 20
+    },
+    {
+      "id": "TEMA_GENERADO_21",
+      "name": "Tema generado ficticio 21",
+      "active": true,
+      "priority": 21
+    },
+    {
+      "id": "TEMA_GENERADO_22",
+      "name": "Tema generado ficticio 22",
+      "active": true,
+      "priority": 22
+    },
+    {
+      "id": "TEMA_GENERADO_23",
+      "name": "Tema generado ficticio 23",
+      "active": true,
+      "priority": 23
+    },
+    {
+      "id": "TEMA_GENERADO_24",
+      "name": "Tema generado ficticio 24",
+      "active": true,
+      "priority": 24
+    },
+    {
+      "id": "TEMA_GENERADO_25",
+      "name": "Tema generado ficticio 25",
+      "active": true,
+      "priority": 25
+    }
+  ],
+  "source": "OPENAI_GENERATED",
+  "active": true,
+  "version": 1,
+  "generationMetadata": {
+    "model": "modelo-ficticio",
+    "generatedAt": "2026-01-01T00:00:00Z",
+    "promptVersion": "ejemplo-v1"
+  },
+  "usageMetadata": {
+    "useCount": 0
+  }
+}

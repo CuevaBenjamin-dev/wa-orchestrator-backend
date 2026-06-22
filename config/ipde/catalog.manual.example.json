@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 1,
+  "tenantCode": "IPDE",
+  "subjects": [
+    {
+      "schemaVersion": 1,
+      "id": "MATERIA_DEMOSTRATIVA_FICTICIA",
+      "tenantCode": "IPDE",
+      "category": "OTROS",
+      "displayName": "Materia Demostrativa Ficticia",
+      "normalizedName": "materia demostrativa ficticia",
+      "aliases": ["Ejemplo No Comercial"],
+      "allowedProductTypes": ["CURSO"],
+      "topics": [
+        {
+          "id": "TEMA_FICTICIO_01",
+          "name": "Tema ficticio 01",
+          "active": true,
+          "priority": 1
+        },
+        {
+          "id": "TEMA_FICTICIO_02",
+          "name": "Tema ficticio 02",
+          "active": true,
+          "priority": 2
+        },
+        {
+          "id": "TEMA_FICTICIO_03",
+          "name": "Tema ficticio 03",
+          "active": true,
+          "priority": 3
+        },
+        {
+          "id": "TEMA_FICTICIO_04",
+          "name": "Tema ficticio 04",
+          "active": true,
+          "priority": 4
+        },
+        {
+          "id": "TEMA_FICTICIO_05",
+          "name": "Tema ficticio 05",
+          "active": true,
+          "priority": 5
+        },
+        {
+          "id": "TEMA_FICTICIO_06",
+          "name": "Tema ficticio 06",
+          "active": true,
+          "priority": 6
+        },
+        {
+          "id": "TEMA_FICTICIO_07",
+          "name": "Tema ficticio 07",
+          "active": true,
+          "priority": 7
+        },
+        {
+          "id": "TEMA_FICTICIO_08",
+          "name": "Tema ficticio 08",
+          "active": true,
+          "priority": 8
+        },
+        {
+          "id": "TEMA_FICTICIO_09",
+          "name": "Tema ficticio 09",
+          "active": true,
+          "priority": 9
+        },
+        {
+          "id": "TEMA_FICTICIO_10",
+          "name": "Tema ficticio 10",
+          "active": true,
+          "priority": 10
+        },
+        {
+          "id": "TEMA_FICTICIO_11",
+          "name": "Tema ficticio 11",
+          "active": true,
+          "priority": 11
+        },
+        {
+          "id": "TEMA_FICTICIO_12",
+          "name": "Tema ficticio 12",
+          "active": true,
+          "priority": 12
+        },
+        {
+          "id": "TEMA_FICTICIO_13",
+          "name": "Tema ficticio 13",
+          "active": true,
+          "priority": 13
+        },
+        {
+          "id": "TEMA_FICTICIO_14",
+          "name": "Tema ficticio 14",
+          "active": true,
+          "priority": 14
+        },
+        {
+          "id": "TEMA_FICTICIO_15",
+          "name": "Tema ficticio 15",
+          "active": true,
+          "priority": 15
+        },
+        {
+          "id": "TEMA_FICTICIO_16",
+          "name": "Tema ficticio 16",
+          "active": true,
+          "priority": 16
+        },
+        {
+          "id": "TEMA_FICTICIO_17",
+          "name": "Tema ficticio 17",
+          "active": true,
+          "priority": 17
+        },
+        {
+          "id": "TEMA_FICTICIO_18",
+          "name": "Tema ficticio 18",
+          "active": true,
+          "priority": 18
+        },
+        {
+          "id": "TEMA_FICTICIO_19",
+          "name": "Tema ficticio 19",
+          "active": true,
+          "priority": 19
+        },
+        {
+          "id": "TEMA_FICTICIO_20",
+          "name": "Tema ficticio 20",
+          "active": true,
+          "priority": 20
+        },
+        {
+          "id": "TEMA_FICTICIO_21",
+          "name": "Tema ficticio 21",
+          "active": true,
+          "priority": 21
+        },
+        {
+          "id": "TEMA_FICTICIO_22",
+          "name": "Tema ficticio 22",
+          "active": true,
+          "priority": 22
+        },
+        {
+          "id": "TEMA_FICTICIO_23",
+          "name": "Tema ficticio 23",
+          "active": true,
+          "priority": 23
+        },
+        {
+          "id": "TEMA_FICTICIO_24",
+          "name": "Tema ficticio 24",
+          "active": true,
+          "priority": 24
+        },
+        {
+          "id": "TEMA_FICTICIO_25",
+          "name": "Tema ficticio 25",
+          "active": true,
+          "priority": 25
+        }
+      ],
+      "source": "MANUAL",
+      "active": true,
+      "version": 1
+    }
+  ]
+}

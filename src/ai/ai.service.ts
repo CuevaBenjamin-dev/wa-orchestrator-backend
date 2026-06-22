@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import OpenAI from 'openai';
 import { z } from 'zod';
 import { zodTextFormat } from 'openai/helpers/zod';
+import { OpenAiClientService } from './openai-client.service';
 
 type GenerateAgentReplyParams = {
   tenantName: string;
@@ -63,21 +63,11 @@ export type IntentClassificationResult = z.infer<
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
-  private readonly client: OpenAI | null;
 
-  constructor(private readonly configService: ConfigService) {
-    const apiKey = this.configService.get<string>('OPENAI_API_KEY');
-
-    /**
-     * Si no hay API key, dejamos client en null.
-     * Esto permite seguir probando el backend sin gastar tokens.
-     */
-    this.client = apiKey
-      ? new OpenAI({
-          apiKey,
-        })
-      : null;
-  }
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly openAiClient: OpenAiClientService,
+  ) {}
 
   /**
    * Clasificación local de respaldo.
@@ -272,7 +262,8 @@ export class AiService {
     const { tenantName, businessType, businessInfo, services, userMessage } =
       params;
 
-    if (!this.client) {
+    const client = this.openAiClient.getClient();
+    if (!client) {
       return this.classifyUserIntentLocally(
         userMessage,
         'No se configuró OPENAI_API_KEY. Se usó clasificación local básica.',
@@ -283,7 +274,7 @@ export class AiService {
       this.configService.get<string>('DEFAULT_OPENAI_MODEL') || 'gpt-4o-mini';
 
     try {
-      const response = await this.client.responses.parse({
+      const response = await client.responses.parse({
         model,
         input: [
           {
@@ -353,7 +344,10 @@ Reglas:
 
       return response.output_parsed;
     } catch (error) {
-      this.logger.error('Error clasificando intención con OpenAI', error);
+      const errorName = error instanceof Error ? error.name : 'UnknownError';
+      this.logger.error(
+        `Error clasificando intención con OpenAI: ${errorName}`,
+      );
 
       return this.classifyUserIntentLocally(
         userMessage,
@@ -384,7 +378,8 @@ Reglas:
      * Si todavía no configuraste OPENAI_API_KEY,
      * devolvemos una respuesta simulada.
      */
-    if (!this.client) {
+    const client = this.openAiClient.getClient();
+    if (!client) {
       return {
         text: `Gracias por escribir a ${tenantName}. Por ahora estoy en modo prueba, pero puedo ayudarte si me indicas qué servicio necesitas.`,
         tokensInput: 0,
@@ -455,19 +450,17 @@ ${userMessage}
     const model =
       this.configService.get<string>('DEFAULT_OPENAI_MODEL') || 'gpt-5.4-mini';
 
-    const response = await this.client.responses.create({
+    const response = await client.responses.create({
       model,
       input,
     });
-
-    const responseAny = response as any;
 
     return {
       text:
         response.output_text ||
         'Gracias por escribirnos. ¿Podrías darme un poco más de detalle para ayudarte mejor?',
-      tokensInput: responseAny.usage?.input_tokens ?? 0,
-      tokensOutput: responseAny.usage?.output_tokens ?? 0,
+      tokensInput: response.usage?.input_tokens ?? 0,
+      tokensOutput: response.usage?.output_tokens ?? 0,
     };
   }
 }

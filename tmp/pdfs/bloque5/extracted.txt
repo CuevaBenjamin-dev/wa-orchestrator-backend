@@ -1,0 +1,1439 @@
+
+===== PAGE 1 =====
+BLOQUE 5 — MOTOR CONVERSACIONAL
+COMERCIAL Y PLAN DE ACCIONES IPDE
+Prerrequisitos obligatorios
+Antes de editar:
+Lee completamente:
+AGENTS.md;
+docs/architecture/current-state.md;
+docs/architecture/ipde-catalog-storage.md;
+docs/architecture/ipde-conversation-state-and-orders.md;
+docs/architecture/ipde-message-understanding.md;
+docs/architecture/ipde-catalog-resolution-and-generation.md;
+src/ipde-sales/;
+src/catalog/;
+src/ai/;
+src/conversations/;
+src/leads/;
+src/whatsapp/whatsapp.service.ts;
+prisma/schema.prisma.
+Inspecciona las APIs públicas reales de:
+IpdeConversationStateService;
+IpdeOrderService;
+IpdeMessageUnderstandingService;
+IpdeCatalogResolutionService;
+CatalogService;
+modelos Prisma de IPDE.
+Explica brevemente el plan antes de editar .
+Ejecuta y registra la línea base:
+npxprismavalidate
+npmruncatalog:validate
+npmrunbuild
+npmtest----runInBand
+npxeslint"src/ipde-sales/**/*.ts"--no-fix
+npxeslint"src/catalog/**/*.ts"--no-fix
+1. 
+2. 
+3. 
+4. 
+5. 
+6. 
+7. 
+8. 
+9. 
+10. 
+11. 
+12. 
+13. 
+14. 
+15. 
+16. 
+17. 
+18. 
+19. 
+20. 
+21. 
+22. 
+23. 
+1
+
+===== PAGE 2 =====
+npxeslint"src/ai/**/*.ts"--no-fix
+npmrunlint----no-fix
+La deuda global actual es de 61 errores y 3 advertencias preexistentes. No debe aumentar .
+Si los contratos reales contradicen esta especificación, detente y explica la diferencia antes de
+implementar cambios incompatibles.
+Objetivo
+Crear el motor de aplicación que procese un turno conversacional de IPDE sin enviarlo todavía a
+WhatsApp.
+Debe:
+Recuperar o crear el estado IPDE de la conversación.
+Respetar la pausa humana persistente.
+Recuperar o crear el pedido activo.
+Construir un contexto mínimo y seguro.
+Interpretar el mensaje mediante IpdeMessageUnderstandingService.
+Resolver catálogo o temas directos mediante IpdeCatalogResolutionService.
+Persistir materias, temas, producto y nombre detectados.
+Determinar qué información falta.
+Avanzar únicamente mediante transiciones válidas.
+Producir un plan de acciones salientes tipado.
+Generar borradores de texto cálidos, breves y comerciales.
+No enviar mensajes ni archivos.
+Ser seguro ante reintentos y concurrencia.
+Fuera del alcance
+Este bloque NO debe:
+integrarse con WhatsappService;
+llamar Meta;
+enviar mensajes reales;
+enviar imágenes;
+enviar PDF;
+procesar comprobantes;
+aprobar pagos;
+calcular precios;
+leer promociones;
+decidir todavía modelos PDF definitivos;
+validar entidades de emisión;
+implementar búsqueda web;
+crear endpoints;
+1. 
+2. 
+1. 
+2. 
+3. 
+4. 
+5. 
+6. 
+7. 
+8. 
+9. 
+10. 
+11. 
+12. 
+13. 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+2
+
+===== PAGE 3 =====
+crear controllers;
+crear cron o jobs;
+crear migraciones;
+modificar schema.prisma;
+modificar UsageService;
+modificar el catálogo manual;
+inventar precios, promociones o disponibilidad institucional.
+Principio arquitectónico
+Separar:
+Interpretar
+→ resolver
+→ planificar
+→ persistir
+→ redactar borradores
+No crear un servicio monolítico.
+Estructura sugerida:
+src/ipde-sales/conversation-engine/
+├── ipde-conversation-turn.service.ts
+├── ipde-conversation-turn.service.spec.ts
+├── ipde-conversation-context.service.ts
+├── ipde-conversation-planner.service.ts
+├── ipde-conversation-planner.service.spec.ts
+├── ipde-turn-persistence.service.ts
+├── ipde-turn-persistence.service.spec.ts
+├── ipde-response-copy.service.ts
+├── ipde-response-copy.service.spec.ts
+├── ipde-conversation-action.schemas.ts
+├── ipde-conversation-action.types.ts
+├── ipde-conversation-turn.schemas.ts
+├── ipde-conversation-engine.errors.ts
+├── ipde-next-required-field.policy.ts
+└── fixtures/
+    └── ipde-conversation-turn-cases.json
+Puedes adaptar nombres, pero conserva las responsabilidades.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+3
+
+===== PAGE 4 =====
+Servicio principal
+Crear un servicio equivalente a:
+classIpdeConversationTurnService{
+asyncprocessTurn(
+input: IpdeConversationTurnInput,
+): Promise<IpdeConversationTurnResult>;
+}
+Este será el único servicio nuevo exportado desde IpdeSalesModule para futura integración.
+Los servicios internos no deben exportarse salvo necesidad justificada.
+Entrada
+Crear un schema Zod estricto equivalente a:
+typeIpdeConversationTurnInput= {
+tenantCode: 'IPDE';
+tenantId: string;
+leadId: string;
+conversationId: string;
+turnId: string;
+userMessage: string;
+recentMessages?: Array<{
+role: 'USER'| 'ASSISTANT';
+content: string;
+}>;
+};
+Reglas
+turnId será posteriormente el ID externo del mensaje de WhatsApp.
+No persistir un nuevo modelo de ejecución en este bloque.
+El caller futuro debe aplicar primero la deduplicación del webhook.
+El motor debe ser razonablemente idempotente ante una repetición accidental.
+userMessage: entre 1 y 4000 caracteres.
+máximo 6 mensajes recientes;
+objetos estrictos;
+UUIDs o identificadores según las convenciones existentes;
+no aceptar campos desconocidos.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+4
+
+===== PAGE 5 =====
+Resultado
+Crear un resultado estricto equivalente a:
+typeIpdeConversationTurnResult= {
+turnId: string;
+state: {
+stageBefore: IpdeConversationStage;
+stageAfter: IpdeConversationStage;
+automationMode: IpdeAutomationMode;
+stateVersionBefore: number;
+stateVersionAfter: number;
+};
+order: {
+orderId: string| null;
+status: IpdeOrderStatus| null;
+createdDuringTurn: boolean;
+};
+understanding: {
+primaryIntent: IpdeIntent;
+secondaryIntents: IpdeIntent[];
+requestPath:
+| 'DIRECT_TOPICS'
+| 'CATALOG_LIST'
+| 'UNDETERMINED';
+source: 'OPENAI'| 'LOCAL_FALLBACK';
+needsClarification: boolean;
+} | null;
+catalogResolution: {
+route:
+| 'DIRECT_TOPICS'
+| 'CATALOG_LISTS_READY'
+| 'NEEDS_CLARIFICATION'
+| 'NO_ACTION';
+subjectsResolved: number;
+generatedNow: number;
+} | null;
+appliedChanges: Array<IpdeAppliedChange>;
+outboundActions: Array<IpdeOutboundAction>;
+deferredIntents: IpdeIntent[];
+5
+
+===== PAGE 6 =====
+metadata: {
+openAiCalls: number;
+tokensInput: number;
+tokensOutput: number;
+latencyMs: number;
+usedFallback: boolean;
+concurrentRetryCount: number;
+};
+};
+No incluir objetos Prisma completos.
+No incluir datos personales en metadata o logs.
+Acciones salientes
+Definir acciones estrictas y discriminadas.
+NO_AUTOMATED_RESPONSE
+{
+type: 'NO_AUTOMATED_RESPONSE';
+reason:
+| 'PAUSED_HUMAN'
+| 'AUTOMATION_DISABLED'
+| 'PAYMENT_UNDER_REVIEW';
+}
+No debe producir borrador de respuesta.
+ASK_SUBJECT_OR_DIRECT_TOPICS
+Para un cliente que aún no indicó qué desea.
+{
+type: 'ASK_SUBJECT_OR_DIRECT_TOPICS';
+messageDraft: string;
+}
+ASK_SUBJECT
+{
+type: 'ASK_SUBJECT';
+6
+
+===== PAGE 7 =====
+messageDraft: string;
+}
+ASK_CLARIFICATION
+{
+type: 'ASK_CLARIFICATION';
+reasonCode: string;
+candidateValues: string[];
+messageDraft: string;
+}
+PRESENT_TOPIC_LIST
+Una acción por materia.
+{
+type: 'PRESENT_TOPIC_LIST';
+subjectCatalogEntryId: string;
+subjectDisplayName: string;
+source:
+| 'MANUAL'
+| 'OPENAI_GENERATED';
+topics: Array<{
+position: number;
+topicId: string;
+topicName: string;
+}>;
+messageDraft: string;
+}
+Debe contener exactamente 25 temas.
+Si existen dos materias, producir dos acciones separadas.
+ASK_TOPIC_SELECTION
+{
+type: 'ASK_TOPIC_SELECTION';
+subjectDisplayNames: string[];
+messageDraft: string;
+}
+7
+
+===== PAGE 8 =====
+CONFIRM_SELECTED_TOPICS
+{
+type: 'CONFIRM_SELECTED_TOPICS';
+topics: Array<{
+topicName: string;
+subjectDisplayName: string| null;
+}>;
+messageDraft: string;
+}
+ASK_PRODUCT_TYPE
+{
+type: 'ASK_PRODUCT_TYPE';
+allowedProductTypes: ProductType[];
+topicNames: string[];
+messageDraft: string;
+}
+ASK_ISSUER_VARIANT
+Este bloque no conoce todavía las reglas institucionales.
+{
+type: 'ASK_ISSUER_VARIANT';
+messageDraft: string;
+configurationPending: true;
+}
+Esta acción no debe afirmar instituciones disponibles.
+Será completada en el Bloque 6.
+ASK_FULL_NAME
+{
+type: 'ASK_FULL_NAME';
+messageDraft: string;
+}
+8
+
+===== PAGE 9 =====
+CONFIRM_FULL_NAME
+{
+type: 'CONFIRM_FULL_NAME';
+fullName: string;
+messageDraft: string;
+}
+ASK_ORDER_CONFIRMATION
+Puede quedar preparada, pero solamente usarla si ya existen:
+temas;
+producto por cada tema;
+nombre confirmado;
+emisor validado.
+Como el emisor todavía no se validará en este bloque, normalmente no se alcanzará.
+REQUEST_HUMAN_TAKEOVER
+{
+type: 'REQUEST_HUMAN_TAKEOVER';
+reason: string;
+messageDraft: string;
+}
+DEFERRED_COMMERCIAL_REQUEST
+Para intenciones que aún no están implementadas:
+precio;
+descuento;
+promoción;
+PDF;
+medios de pago.
+{
+type: 'DEFERRED_COMMERCIAL_REQUEST';
+intents: IpdeIntent[];
+reason:
+| 'PRICING_NOT_CONFIGURED'
+| 'MEDIA_NOT_CONFIGURED'
+| 'ISSUER_NOT_CONFIGURED';
+}
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+9
+
+===== PAGE 10 =====
+No inventar una respuesta comercial.
+Cambios aplicados
+Definir una unión discriminada para auditoría interna:
+STATE_CREATED
+ORDER_CREATED
+SUBJECT_ADDED
+SUBJECT_LIST_PRESENTED
+SUBJECT_SELECTION_COMPLETED
+ORDER_ITEM_ADDED
+ORDER_ITEM_RESTORED
+PRODUCT_TYPE_SET
+FULL_NAME_SET
+FULL_NAME_CONFIRMED
+STAGE_TRANSITIONED
+AUTOMATION_PAUSED
+NO_CHANGE
+No incluir valores sensibles completos.
+Ejemplo:
+{
+type: 'ORDER_ITEM_ADDED';
+entityId: string;
+}
+No registrar el nombre completo en appliedChanges.
+Construcción del contexto
+Crear IpdeConversationContextService.
+Debe recuperar:
+estado;
+automatización;
+pedido activo;
+materias;
+ítems activos;
+nombre;
+productos;
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+10
+
+===== PAGE 11 =====
+emisor/variante existentes;
+listas presentadas previamente cuando puedan reconstruirse desde:
+materias con LIST_PRESENTED;
+catalogEntryId;
+catálogo actual.
+Debe convertirlos al contrato mínimo del intérprete.
+No enviar a OpenAI:
+IDs internos innecesarios;
+precios;
+datos personales no requeridos;
+conversaciones completas.
+Máximo 6 mensajes recientes.
+Regla de pausa humana
+Antes de llamar OpenAI:
+Si automationMode = PAUSED_HUMAN
+→ NO_AUTOMATED_RESPONSE
+→ no llamar OpenAI
+→ no consultar generación
+→ no modificar pedido
+También se aplica a:
+stage = PAYMENT_UNDER_REVIEW
+Si automationMode = DISABLED, tampoco debe responder .
+Este chequeo debe ser la primera decisión después de validar ownership.
+Flujo principal
+Paso 1: estado
+Ejecutar:
+getOrCreateState
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+11
+
+===== PAGE 12 =====
+Validar:
+tenant;
+lead;
+conversación;
+ownership.
+Paso 2: pausa
+Si está pausado, finalizar inmediatamente.
+Paso 3: pedido activo
+Crear pedido solamente cuando el mensaje tenga relevancia comercial.
+No crear pedido por:
+saludo aislado;
+mensaje vacío inválido;
+solicitud humana inmediata;
+conversación pausada.
+Crear pedido cuando exista:
+materia;
+tema;
+solicitud de lista;
+producto;
+nombre asociado al proceso;
+intención de compra.
+Documentar la política exacta.
+Paso 4: contexto
+Construir contexto reducido.
+Paso 5: interpretación
+Llamar una sola vez a:
+IpdeMessageUnderstandingService
+No interpretar de nuevo el mensaje mediante otros prompts.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+12
+
+===== PAGE 13 =====
+Paso 6: solicitud humana
+Si wantsHuman=true o la intención principal es REQUEST_HUMAN:
+pausar para humano;
+producir REQUEST_HUMAN_TAKEOVER;
+no continuar con catálogo;
+no realizar preguntas comerciales adicionales.
+Paso 7: catálogo
+Llamar a IpdeCatalogResolutionService cuando:
+ruta sea catálogo;
+ruta sea directa;
+existan selecciones numéricas.
+No llamarlo para saludos o mensajes sin contenido comercial.
+Paso 8: persistencia
+Persistir únicamente información validada.
+Paso 9: siguiente dato faltante
+Usar una política declarativa.
+Paso 10: transición
+Aplicar como máximo una transición final por turno, salvo creación inicial.
+Paso 11: acciones
+Producir acciones salientes, sin ejecutarlas.
+Persistencia de materias
+Para cada materia resuelta:
+crear IpdeSubjectRequest si no existe;
+guardar:
+display name;
+normalized name;
+categoría;
+catalogEntryId;
+catalogSource;
+si se presenta la lista:
+1. 
+2. 
+3. 
+4. 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+13
+
+===== PAGE 14 =====
+marcar LIST_PRESENTED;
+guardar listPresentedAt.
+Si la materia ya existe:
+no duplicarla;
+actualizar solamente campos vacíos o información más precisa;
+no cambiar silenciosamente una selección confirmada.
+Si faltan métodos en IpdeOrderService, añadir operaciones de dominio explícitas:
+markSubjectListPresented(...)
+markSubjectSelectionComplete(...)
+No escribir Prisma directamente desde el motor si existe una capa de repositorio apropiada.
+Persistencia de temas
+Ruta directa
+Cuando el cliente ya proporciona temas:
+añadir un ítem por tema;
+subjectRequestId puede ser nulo;
+preservar el nombre escrito;
+normalizar para unicidad;
+no generar lista;
+no validar contra otro catálogo sin evidencia.
+Selección numérica
+Cuando la resolución devuelve temas de listas:
+usar topicId;
+usar nombre oficial del catálogo;
+relacionar subjectRequestId;
+evitar duplicados;
+restaurar elementos eliminados.
+Correcciones
+Si el cliente dice explícitamente:
+quita el segundo
+cambia la opción 4 por la 7
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+14
+
+===== PAGE 15 =====
+el intérprete puede detectar corrección, pero la eliminación compleja no debe implementarse de forma
+insegura.
+En este bloque:
+aplicar correcciones únicamente cuando el objetivo sea inequívoco;
+en otro caso producir ASK_CLARIFICATION;
+nunca borrar definitivamente;
+utilizar estado REMOVED.
+Añadir métodos de dominio si hacen falta:
+removeOrderItem(...)
+restoreOrderItem(...)
+Persistencia del tipo de producto
+Si la extracción contiene una selección de producto:
+aplicar a todos cuando appliesTo=ALL;
+aplicar a materia cuando existe referencia inequívoca;
+aplicar a tema cuando existe referencia inequívoca;
+no aplicar si la referencia es ambigua;
+no permitir códigos fuera de PRODUCT_TYPES;
+no sobrescribir un producto confirmado salvo corrección explícita.
+Si no todos los ítems tienen producto:
+siguiente dato faltante = PRODUCT_TYPE
+Persistencia del nombre
+Si existe fullNameCandidate:
+conservar letras y tildes;
+normalizar solo espacios;
+utilizar el servicio existente;
+no confirmar automáticamente salvo que:
+el cliente diga explícitamente que está correcto;
+o la etapa ya esté diseñada para una confirmación explícita.
+Primera captura:
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+15
+
+===== PAGE 16 =====
+fullName = candidato
+fullNameConfirmedAt = null
+La acción siguiente debe ser:
+CONFIRM_FULL_NAME
+Cuando la interpretación tenga:
+confirmation = CONFIRMS
+y ya exista nombre pendiente:
+confirmar el nombre
+No volver a pedirlo si ya está confirmado.
+Política del siguiente dato faltante
+Crear una política pura y testeada.
+Orden inicial:
+1. Aclaración crítica.
+2. Materia o temas.
+3. Selección de temas.
+4. Tipo de producto.
+5. Variante de emisor.
+6. Nombre completo.
+7. Confirmación del nombre.
+8. Confirmación del pedido.
+9. Precio/pago, en bloques posteriores.
+Consideración importante
+El cliente puede proporcionar datos adelantados.
+Ejemplo:
+Soy Ana Torres y quiero una especialización en Educación Inicial.
+16
+
+===== PAGE 17 =====
+Debe guardar:
+nombre;
+producto;
+materia.
+Después:
+resolver la lista;
+presentar temas;
+no volver a preguntar nombre o producto.
+La política debe consultar lo que ya existe, no asumir un flujo rígido.
+Transiciones por escenario
+Saludo sin datos
+NEW
+→ UNDERSTANDING_REQUEST
+Acción:
+ASK_SUBJECT_OR_DIRECT_TOPICS
+No crear pedido.
+Materia identificada y lista disponible
+NEW / UNDERSTANDING_REQUEST / WAITING_FOR_SUBJECT
+→ TOPIC_LIST_READY
+→ resultado final del turno: WAITING_FOR_TOPIC_SELECTION
+Como se permite una sola transición final por turno, selecciona la estrategia compatible con la política
+existente:
+transición directa permitida y documentada;
+o extender de forma controlada la política.
+No realizar dos escrituras de estado innecesarias.
+La etapa final debe ser:
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+17
+
+===== PAGE 18 =====
+WAITING_FOR_TOPIC_SELECTION
+Si la política actual no permite una transición directa necesaria, añadirla explícitamente, documentarla y
+probarla. No alterar otras transiciones.
+Temas directos o selección válida
+→ TOPICS_SELECTED
+Si falta producto:
+acción ASK_PRODUCT_TYPE
+etapa final WAITING_FOR_PRODUCT_TYPE
+Utilizar una transición final compatible y explícita.
+Producto completo
+Si falta emisor:
+WAITING_FOR_ISSUER_VARIANT
+ASK_ISSUER_VARIANT
+La acción tendrá configurationPending=true.
+No afirmar opciones institucionales.
+Nombre capturado
+Si no está confirmado:
+CONFIRM_FULL_NAME
+No avanzar a confirmación de pedido.
+Solicitud humana
+HUMAN_TAKEOVER
+PAUSED_HUMAN
+18
+
+===== PAGE 19 =====
+Aplicación atómica de un turno
+Un turno puede requerir:
+añadir materias;
+marcar listas presentadas;
+añadir temas;
+aplicar productos;
+guardar nombre;
+cambiar etapa.
+No dejar datos parcialmente aplicados por un error evitable.
+Implementa una operación transaccional de aplicación del plan, adaptada a la arquitectura existente.
+Opciones válidas:
+Añadir un método batch transaccional en la capa de pedidos.
+Crear un repositorio interno de aplicación de turno.
+Utilizar una transacción Prisma desde una capa de persistencia específica.
+No:
+llamar OpenAI dentro de la transacción;
+consultar filesystem dentro de la transacción;
+mantener transacciones abiertas durante generación;
+escribir Prisma directamente desde el planner puro.
+Flujo recomendado:
+OpenAI y catálogo fuera de transacción
+↓
+crear plan puro
+↓
+aplicar mutaciones en transacción corta
+↓
+transición optimista
+Si la versión del estado cambió:
+recargar contexto;
+recalcular solamente la parte determinista;
+reintentar como máximo dos veces;
+nunca volver a llamar OpenAI innecesariamente;
+si continúa el conflicto, devolver error seguro.
+• 
+• 
+• 
+• 
+• 
+• 
+1. 
+2. 
+3. 
+• 
+• 
+• 
+• 
+1. 
+2. 
+3. 
+4. 
+5. 
+19
+
+===== PAGE 20 =====
+Idempotencia razonable
+La deduplicación persistente del mensaje continúa siendo responsabilidad del webhook mediante 
+Message.externalId.
+Sin embargo, repetir accidentalmente processTurn con el mismo contenido no debe:
+crear materias duplicadas;
+crear temas duplicados;
+crear varios pedidos activos;
+retroceder el estado;
+sobrescribir datos confirmados;
+llamar OpenAI nuevamente si la lista ya quedó persistida.
+No afirmar que existe idempotencia completa por turnId sin una tabla que la garantice.
+Documentar esta limitación.
+Redacción de respuestas
+Crear IpdeResponseCopyService.
+Debe ser determinista. No llamar OpenAI.
+Tono:
+humano;
+cálido;
+breve;
+directo;
+orientado a avanzar;
+sin sonar robótico;
+sin presión excesiva;
+máximo una pregunta principal por mensaje;
+emojis moderados.
+Bienvenida
+Ejemplo base:
+¡Hola! Claro, te ayudo 😊
+¿Ya tienes los temas que deseas o prefieres que te envíe una lista según el 
+área de tu interés?
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+20
+
+===== PAGE 21 =====
+Solicitud de materia
+Perfecto. Indícame el área o tema que buscas y te envío opciones para elegir.
+Presentación de lista
+Perfecto. Te comparto opciones enfocadas en {materia}:
+1. ...
+...
+25. ...
+Puedes indicarme los números o nombres de las opciones que deseas.
+No llamar a la lista “catálogo interno”.
+Varias listas
+Cada materia se presenta en un mensaje independiente.
+No unir 50 temas en un único texto.
+Temas directos
+Perfecto. Tengo registrados estos temas:
+• ...
+• ...
+Ahora indícame si los deseas como Diplomado, Especialización o Curso.
+Producto
+Debe mostrar únicamente allowedProductTypes.
+Convertir códigos a nombres naturales:
+CURSO_CAPACITACION
+→ Curso de capacitación
+Emisor
+Por ahora:
+21
+
+===== PAGE 22 =====
+Ya tengo el tipo de programa. Ahora continuaremos con la opción de emisión 
+correspondiente.
+No mencionar instituciones hasta el Bloque 6.
+Nombre
+Indícame tus nombres y apellidos completos, tal como deben aparecer en los 
+documentos.
+Confirmación del nombre
+Tengo registrado:
+{nombre}
+¿Está escrito correctamente?
+Aclaración
+Debe ser específica y corta.
+Ejemplo:
+Cuando indicas “IVA”, ¿te refieres al Impuesto al Valor Agregado o a otra 
+área?
+No inventar candidatos que no vengan del resultado estructurado.
+Humano
+Claro. Voy a dejar tu consulta para atención personal.
+Después debe quedar pausado.
+Longitud de listas para WhatsApp
+Una lista de 25 temas puede superar límites prácticos.
+El action planner debe permitir dividir una lista en fragmentos, pero conservar una única acción lógica o
+varias acciones ordenadas.
+22
+
+===== PAGE 23 =====
+Crear:
+{
+type: 'PRESENT_TOPIC_LIST';
+chunks: Array<{
+sequence: number;
+text: string;
+}>;
+}
+Reglas:
+no cortar un tema a la mitad;
+conservar numeración 1–25;
+máximo configurable conservador por fragmento;
+valor predeterminado sugerido: 3000 caracteres;
+orden estable;
+introducción solamente en el primer fragmento;
+instrucción de selección solamente en el último.
+Añadir a .env.example:
+IPDE_WHATSAPP_TEXT_CHUNK_MAX_CHARS=3000
+Aunque todavía no se envíe a WhatsApp, preparar el formato.
+Validar valor entre 500 y 4000.
+Intenciones diferidas
+Estas intenciones todavía no pueden resolverse completamente:
+REQUEST_PRICE
+REQUEST_DISCOUNT
+REQUEST_PROMOTION
+REQUEST_MODEL_PDF
+REQUEST_PAYMENT_METHODS
+PAYMENT_PROOF_MENTION
+El motor debe:
+conservarlas en deferredIntents;
+no inventar una respuesta;
+no descartarlas;
+permitir que bloques futuros las procesen;
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+23
+
+===== PAGE 24 =====
+continuar con el siguiente dato esencial solo cuando sea comercialmente apropiado.
+Ejemplo:
+Cliente: ¿Cuánto cuesta Derecho Civil?
+El motor puede:
+registrar Derecho Civil;
+resolver la lista;
+conservar REQUEST_PRICE como diferida;
+no informar un precio.
+No debe responder falsamente que el precio no existe.
+Métricas
+Acumular:
+llamadas OpenAI del intérprete;
+llamadas OpenAI del generador;
+tokens de ambos;
+latencia total;
+uso de fallback;
+listas generadas.
+No persistir todavía en UsageDaily.
+No modificar UsageService.
+Errores de dominio
+Crear errores seguros equivalentes a:
+IpdeConversationTurnOwnershipError.
+IpdeConversationTurnConflictError.
+IpdeConversationTurnPlanningError.
+IpdeConversationTurnPersistenceError.
+IpdeConversationPausedError.
+IpdeConversationContextInvalidError.
+IpdeOutboundActionInvalidError.
+No incluir nombres, mensajes o listas en el texto del error .
+• 
+1. 
+2. 
+3. 
+4. 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+24
+
+===== PAGE 25 =====
+Logs
+Permitido:
+UUID o turnId hasheado;
+tenantId parcial o seguro;
+etapa antes/después;
+cantidad de acciones;
+códigos de intención;
+latencia;
+llamadas OpenAI;
+código de error .
+Prohibido:
+mensaje completo;
+nombre completo;
+temas completos;
+API keys;
+prompts;
+historial.
+Pruebas obligatorias
+Todas las llamadas OpenAI deben estar mockeadas.
+No llamar Meta.
+Usar base controlada o repositorios mock según la capa.
+Pausa
+PAUSED_HUMAN devuelve NO_AUTOMATED_RESPONSE.
+DISABLED devuelve NO_AUTOMATED_RESPONSE.
+PAYMENT_UNDER_REVIEW no llama OpenAI.
+Conversación pausada no modifica pedido.
+Inicio
+Saludo crea estado, pero no pedido.
+Saludo produce ASK_SUBJECT_OR_DIRECT_TOPICS.
+Mensaje sin materia produce solicitud de aclaración o materia.
+Catálogo
+Derecho Civil presenta 25 temas.
+Dos materias producen dos listas separadas.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+1. 
+2. 
+3. 
+4. 
+1. 
+2. 
+3. 
+1. 
+2. 
+25
+
+===== PAGE 26 =====
+Lista manual no genera OpenAI adicional.
+Lista persistente se reutiliza.
+Materia nueva utiliza el resultado del Bloque 4.
+Sigla ambigua no genera lista.
+Falla parcial conserva listas correctas.
+Temas directos
+Temas directos omiten lista.
+Temas directos se guardan una sola vez.
+Repetir el turno no duplica temas.
+Selección numérica guarda temas oficiales.
+Selección numérica inválida pide aclaración.
+Producto
+Producto ALL se aplica a todos los ítems.
+Producto por tema se aplica solo al objetivo.
+Referencia ambigua no sobrescribe.
+No sobrescribe producto confirmado sin corrección.
+Falta de producto produce ASK_PRODUCT_TYPE.
+Nombre
+Captura nombre sin confirmarlo.
+Produce CONFIRM_FULL_NAME.
+Confirmación explícita marca nombre confirmado.
+No reemplaza nombre confirmado sin corrección.
+No incluye nombre en logs.
+Estado
+Transiciones válidas.
+No realiza retrocesos arbitrarios.
+Aplica una transición final por turno.
+Reintenta conflicto optimista sin repetir OpenAI.
+Falla de concurrencia persistente devuelve error seguro.
+Repetición accidental no retrocede estado.
+Pedido
+Crea un solo pedido activo cuando corresponde.
+No crea pedido por saludo aislado.
+Guarda materias resueltas.
+Marca listas presentadas.
+Marca selección completa.
+Conserva pedidos históricos.
+3. 
+4. 
+5. 
+6. 
+7. 
+1. 
+2. 
+3. 
+4. 
+5. 
+1. 
+2. 
+3. 
+4. 
+5. 
+1. 
+2. 
+3. 
+4. 
+5. 
+1. 
+2. 
+3. 
+4. 
+5. 
+6. 
+1. 
+2. 
+3. 
+4. 
+5. 
+6. 
+26
+
+===== PAGE 27 =====
+Acciones
+Todas las acciones validan con Zod.
+No existen propiedades extra.
+Las listas contienen 25 temas.
+Fragmenta listas largas sin cortar temas.
+Mantiene numeración.
+Introducción solo en primer fragmento.
+Instrucción de selección solo en último.
+Copys cumplen longitud y pregunta principal.
+Varias listas conservan orden.
+Intenciones diferidas
+Precio queda diferido.
+Descuento queda diferido.
+PDF queda diferido.
+Promoción queda diferida.
+Medios de pago quedan diferidos.
+No inventa importes ni archivos.
+Humano
+Solicitud humana pausa.
+Produce una única acción humana.
+No continúa con catálogo después de pausar .
+Regresión
+No modifica WhatsappService.
+No llama Meta.
+No envía mensajes.
+No modifica Prisma.
+No crea migración.
+Catalog sigue validando.
+Understanding sigue funcionando.
+Catalog resolution sigue funcionando.
+Estado y pedidos siguen funcionando.
+No realiza llamadas reales.
+No persiste métricas en Usage.
+Fixtures
+Crear casos ficticios:
+1. 
+2. 
+3. 
+4. 
+5. 
+6. 
+7. 
+8. 
+9. 
+1. 
+2. 
+3. 
+4. 
+5. 
+6. 
+1. 
+2. 
+3. 
+1. 
+2. 
+3. 
+4. 
+5. 
+6. 
+7. 
+8. 
+9. 
+10. 
+11. 
+27
+
+===== PAGE 28 =====
+src/ipde-sales/conversation-engine/fixtures/
+  ipde-conversation-turn-cases.json
+Incluir al menos:
+saludo;
+Derecho Civil;
+Derecho Civil y Penal;
+Educación Inicial;
+Andrología;
+IVA;
+temas directos;
+selección numérica;
+nombre adelantado;
+producto adelantado;
+precio al inicio;
+solicitud de PDF;
+solicitud humana;
+conversación pausada;
+repetición del turno.
+No usar conversaciones reales.
+Integración NestJS
+Registrar servicios en IpdeSalesModule.
+Exportar únicamente IpdeConversationTurnService.
+No importar IpdeSalesModule en WhatsappModule si aún no está importado.
+No modificar WhatsappService.
+No crear controller .
+No crear endpoint.
+No crear job.
+No crear cron.
+Documentación
+Crear:
+docs/architecture/ipde-conversation-engine.md
+Debe explicar:
+objetivo;
+flujo de un turno;
+separación planner/persistencia/copy;
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+28
+
+===== PAGE 29 =====
+entrada y salida;
+acciones;
+contexto mínimo;
+pausa humana;
+creación del pedido;
+datos adelantados;
+siguiente dato faltante;
+transacciones;
+concurrencia;
+idempotencia limitada;
+fragmentación de listas;
+intenciones diferidas;
+limitaciones;
+qué no está conectado todavía.
+Actualizar documentación anterior solo si cambian contratos públicos.
+Verificaciones obligatorias
+Ejecutar:
+npxprismavalidate
+npmruncatalog:validate
+npmrunbuild
+npmtest----runInBand
+npxeslint"src/ipde-sales/**/*.ts"--no-fix
+npxeslint"src/catalog/**/*.ts"--no-fix
+npxeslint"src/ai/**/*.ts"--no-fix
+npmrunlint----no-fix
+gitdiff--check
+Confirmar:
+gitdiff--prisma/schema.prisma
+gitstatusprisma/migrations
+gitdiff--src/whatsapp
+No debe haber cambios.
+No ejecutar migraciones.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+29
+
+===== PAGE 30 =====
+Informe final requerido
+Informar:
+Resumen.
+Arquitectura implementada.
+Archivos creados y modificados.
+Contrato de entrada y salida.
+Tipos de acción.
+Política del siguiente dato.
+Flujo de persistencia.
+Estrategia transaccional.
+Manejo de concurrencia.
+Manejo de pausa humana.
+Copys creados.
+Fragmentación de listas.
+Intenciones diferidas.
+Pruebas añadidas.
+Resultados de comandos.
+Diferencia del lint.
+Riesgos y pendientes.
+Verificación manual.
+Confirmación explícita de que:
+no modificaste Prisma;
+no creaste migraciones;
+no modificaste el webhook;
+no enviaste mensajes;
+no llamaste Meta;
+no calculaste precios;
+no enviaste PDF o imágenes;
+no procesaste comprobantes;
+no creaste endpoints;
+no hiciste llamadas reales en tests.
+Criterios de aceptación
+El bloque termina solamente si:
+existe un motor de turno IPDE aislado;
+respeta pausa humana antes de OpenAI;
+crea pedidos únicamente cuando corresponde;
+interpreta una sola vez;
+resuelve catálogo una sola vez;
+guarda materias y temas sin duplicar;
+acepta datos adelantados;
+determina el siguiente dato faltante;
+avanza mediante transiciones válidas;
+produce acciones tipadas;
+1. 
+2. 
+3. 
+4. 
+5. 
+6. 
+7. 
+8. 
+9. 
+10. 
+11. 
+12. 
+13. 
+14. 
+15. 
+16. 
+17. 
+18. 
+19. 
+◦ 
+◦ 
+◦ 
+◦ 
+◦ 
+◦ 
+◦ 
+◦ 
+◦ 
+◦ 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+30
+
+===== PAGE 31 =====
+produce textos cálidos y breves;
+fragmenta listas de 25 temas;
+no inventa precios, instituciones ni archivos;
+conserva intenciones futuras;
+soporta concurrencia optimista;
+no modifica WhatsApp;
+no cambia Prisma;
+no envía mensajes;
+tests y build pasan;
+el código nuevo no añade errores de lint.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+31

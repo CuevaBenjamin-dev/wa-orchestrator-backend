@@ -1,0 +1,29 @@
+[
+  {
+    "id": "civil-two-seven-penal-three",
+    "message": "De Civil quiero la 2 y la 7, de Penal la 3",
+    "selections": [
+      { "subjectReference": "Civil", "positions": [2, 7] },
+      { "subjectReference": "Penal", "positions": [3] }
+    ],
+    "expectedResolvedSubjects": 2
+  },
+  {
+    "id": "duplicate-position",
+    "message": "De Civil quiero la 2, la 2 y la 7",
+    "selections": [{ "subjectReference": "Civil", "positions": [2, 2, 7] }],
+    "expectedPositions": [2, 7]
+  },
+  {
+    "id": "position-not-available",
+    "message": "De Civil quiero la 25",
+    "selections": [{ "subjectReference": "Civil", "positions": [25] }],
+    "expectedReason": "POSITION_NOT_AVAILABLE"
+  },
+  {
+    "id": "without-presented-list",
+    "message": "Quiero la 2",
+    "selections": [{ "subjectReference": null, "positions": [2] }],
+    "expectedReason": "NO_PRESENTED_LIST"
+  }
+]

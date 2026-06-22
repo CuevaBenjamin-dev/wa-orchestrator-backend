@@ -39,6 +39,63 @@ enum PredefinedResponseMatchType {
   DEFAULT
 }
 
+enum IpdeConversationStage {
+  NEW
+  UNDERSTANDING_REQUEST
+  WAITING_FOR_SUBJECT
+  TOPIC_LIST_READY
+  WAITING_FOR_TOPIC_SELECTION
+  TOPICS_SELECTED
+  WAITING_FOR_PRODUCT_TYPE
+  WAITING_FOR_ISSUER_VARIANT
+  WAITING_FOR_FULL_NAME
+  WAITING_FOR_ORDER_CONFIRMATION
+  WAITING_FOR_PAYMENT
+  PAYMENT_UNDER_REVIEW
+  HUMAN_TAKEOVER
+  READY_FOR_ISSUANCE
+  COMPLETED
+}
+
+enum IpdeAutomationMode {
+  ACTIVE
+  PAUSED_HUMAN
+  DISABLED
+}
+
+enum IpdeOrderStatus {
+  DRAFT
+  AWAITING_CONFIRMATION
+  CONFIRMED
+  AWAITING_PAYMENT
+  PAYMENT_UNDER_REVIEW
+  READY_FOR_ISSUANCE
+  COMPLETED
+  CANCELLED
+}
+
+enum IpdePaymentStatus {
+  NOT_REQUESTED
+  AWAITING_PROOF
+  PROOF_RECEIVED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum IpdeSubjectRequestStatus {
+  REQUESTED
+  LIST_PRESENTED
+  SELECTION_COMPLETE
+  CANCELLED
+}
+
+enum IpdeOrderItemStatus {
+  DRAFT
+  CONFIRMED
+  REMOVED
+}
+
 model Tenant {
   id              String       @id @default(uuid())
   name            String
@@ -53,6 +110,11 @@ model Tenant {
 
   predefinedResponses PredefinedResponse[]
   knowledgeItems      KnowledgeItem[]
+
+  ipdeConversationStates IpdeConversationState[]
+  ipdeOrders             IpdeOrder[]
+  ipdeSubjectRequests    IpdeSubjectRequest[]
+  ipdeOrderItems         IpdeOrderItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -87,6 +149,8 @@ model Lead {
   tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   conversations Conversation[]
 
+  ipdeConversationStates IpdeConversationState[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -103,6 +167,8 @@ model Conversation {
   tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   lead     Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
   messages Message[]
+
+  ipdeConversationState IpdeConversationState?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -186,4 +252,116 @@ model KnowledgeItem {
 
   @@index([tenantId, isActive])
   @@index([tenantId, category])
+}
+
+model IpdeConversationState {
+  id               String                @id @default(uuid())
+  tenantId         String
+  leadId           String
+  conversationId   String                @unique
+  stage            IpdeConversationStage @default(NEW)
+  automationMode   IpdeAutomationMode    @default(ACTIVE)
+  pauseReason      String?
+  pausedAt         DateTime?
+  resumedAt        DateTime?
+  stateVersion     Int                   @default(1)
+  lastTransitionAt DateTime              @default(now())
+  activeOrderId    String?               @unique
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lead         Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  orders       IpdeOrder[]  @relation("IpdeStateOrders")
+  activeOrder  IpdeOrder?   @relation("IpdeActiveOrder", fields: [activeOrderId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, stage])
+  @@index([tenantId, automationMode])
+  @@index([leadId])
+}
+
+model IpdeOrder {
+  id                  String            @id @default(uuid())
+  tenantId            String
+  conversationStateId String
+  status              IpdeOrderStatus   @default(DRAFT)
+  paymentStatus       IpdePaymentStatus @default(NOT_REQUESTED)
+  fullName            String?
+  normalizedFullName  String?
+  fullNameConfirmedAt DateTime?
+  currencyCode        String            @default("PEN")
+  quotedAmount        Decimal?          @db.Decimal(12, 2)
+  quoteConfirmedAt    DateTime?
+  confirmedAt         DateTime?
+  readyForIssuanceAt  DateTime?
+  completedAt         DateTime?
+  cancelledAt         DateTime?
+
+  tenant            Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversationState IpdeConversationState  @relation("IpdeStateOrders", fields: [conversationStateId], references: [id], onDelete: Cascade)
+  activeForState    IpdeConversationState? @relation("IpdeActiveOrder")
+  subjectRequests   IpdeSubjectRequest[]
+  items             IpdeOrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([conversationStateId, createdAt])
+  @@index([paymentStatus])
+}
+
+model IpdeSubjectRequest {
+  id                   String                   @id @default(uuid())
+  tenantId             String
+  orderId              String
+  categoryCode         String?
+  catalogEntryId       String?
+  displayName          String
+  normalizedName       String
+  catalogSource        String?
+  status               IpdeSubjectRequestStatus @default(REQUESTED)
+  listPresentedAt      DateTime?
+  selectionCompletedAt DateTime?
+
+  tenant Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order  IpdeOrder       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  items  IpdeOrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orderId, normalizedName])
+  @@index([tenantId, normalizedName])
+  @@index([orderId, status])
+}
+
+model IpdeOrderItem {
+  id                  String              @id @default(uuid())
+  tenantId            String
+  orderId             String
+  subjectRequestId    String?
+  catalogTopicId      String?
+  topicName           String
+  normalizedTopicName String
+  productTypeCode     String?
+  issuerCode          String?
+  issuerVariantCode   String?
+  status              IpdeOrderItemStatus @default(DRAFT)
+  confirmedAt         DateTime?
+  removedAt           DateTime?
+
+  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order          IpdeOrder           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  subjectRequest IpdeSubjectRequest? @relation(fields: [subjectRequestId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orderId, normalizedTopicName])
+  @@index([tenantId, status])
+  @@index([orderId])
+  @@index([subjectRequestId])
 }

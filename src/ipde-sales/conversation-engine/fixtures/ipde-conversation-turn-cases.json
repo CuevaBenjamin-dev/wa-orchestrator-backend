@@ -1,0 +1,104 @@
+[
+  {
+    "id": "greeting-no-order",
+    "message": "Hola",
+    "expectedAction": "ASK_SUBJECT_OR_DIRECT_TOPICS",
+    "createsOrder": false
+  },
+  {
+    "id": "paused-human",
+    "message": "Necesito derecho civil",
+    "expectedAction": "NO_AUTOMATED_RESPONSE",
+    "createsOrder": false
+  },
+  {
+    "id": "automation-disabled",
+    "message": "Necesito derecho civil",
+    "expectedAction": "NO_AUTOMATED_RESPONSE",
+    "createsOrder": false
+  },
+  {
+    "id": "payment-review",
+    "message": "¿Qué sigue?",
+    "expectedAction": "NO_AUTOMATED_RESPONSE",
+    "createsOrder": false
+  },
+  {
+    "id": "human-request",
+    "message": "Quiero hablar con un asesor",
+    "expectedAction": "REQUEST_HUMAN_TAKEOVER",
+    "createsOrder": false
+  },
+  {
+    "id": "subject-list",
+    "message": "Quiero la lista de derecho civil",
+    "expectedAction": "PRESENT_TOPIC_LIST",
+    "createsOrder": true
+  },
+  {
+    "id": "direct-topic",
+    "message": "Quiero responsabilidad civil",
+    "expectedAction": "CONFIRM_SELECTED_TOPICS",
+    "createsOrder": true
+  },
+  {
+    "id": "numeric-selection",
+    "message": "De Civil quiero la 2 y la 7",
+    "expectedAction": "CONFIRM_SELECTED_TOPICS",
+    "createsOrder": true
+  },
+  {
+    "id": "ambiguous-number",
+    "message": "Quiero la 2",
+    "expectedAction": "ASK_CLARIFICATION",
+    "createsOrder": true
+  },
+  {
+    "id": "product-all",
+    "message": "Todos como diplomado",
+    "expectedAction": "ASK_ISSUER_VARIANT",
+    "createsOrder": true
+  },
+  {
+    "id": "full-name",
+    "message": "Mi nombre es Ana Torres",
+    "expectedAction": "CONFIRM_FULL_NAME",
+    "createsOrder": true
+  },
+  {
+    "id": "confirm-name",
+    "message": "Sí",
+    "expectedAction": "ASK_ORDER_CONFIRMATION",
+    "createsOrder": true
+  },
+  {
+    "id": "price-deferred",
+    "message": "¿Cuál es el precio de Derecho Civil?",
+    "expectedAction": "DEFERRED_COMMERCIAL_REQUEST",
+    "createsOrder": true
+  },
+  {
+    "id": "promotion-deferred",
+    "message": "Envíame la promoción",
+    "expectedAction": "DEFERRED_COMMERCIAL_REQUEST",
+    "createsOrder": false
+  },
+  {
+    "id": "payment-proof-deferred",
+    "message": "Ya envié mi comprobante",
+    "expectedAction": "DEFERRED_COMMERCIAL_REQUEST",
+    "createsOrder": false
+  },
+  {
+    "id": "repeated-topic-idempotent",
+    "message": "Quiero responsabilidad civil",
+    "expectedAction": "ASK_PRODUCT_TYPE",
+    "createsOrder": false
+  },
+  {
+    "id": "concurrent-retry",
+    "message": "Quiero la lista de derecho civil",
+    "expectedAction": "PRESENT_TOPIC_LIST",
+    "createsOrder": true
+  }
+]

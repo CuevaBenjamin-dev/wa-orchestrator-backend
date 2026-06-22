@@ -9,6 +9,8 @@ import { LeadsModule } from './leads/leads.module';
 import { ConversationsModule } from './conversations/conversations.module';
 import { UsageModule } from './usage/usage.module';
 import { RulesModule } from './rules/rules.module';
+import { CatalogModule } from './catalog/catalog.module';
+import { IpdeSalesModule } from './ipde-sales/ipde-sales.module';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { RulesModule } from './rules/rules.module';
     ConversationsModule,
     UsageModule,
     RulesModule,
+    CatalogModule,
+    IpdeSalesModule,
   ],
 })
 export class AppModule {}
