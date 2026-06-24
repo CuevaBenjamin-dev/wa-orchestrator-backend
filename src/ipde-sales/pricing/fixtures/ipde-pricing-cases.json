@@ -1,0 +1,88 @@
+{
+  "cases": [
+    {
+      "name": "Derecho Civil, Diplomado, CAC",
+      "items": [
+        {
+          "itemId": "derecho-civil-1",
+          "categoryCode": "DERECHO",
+          "productTypeCode": "DIPLOMADO",
+          "issuerCode": "CAC",
+          "issuerVariantCode": "CAC_DECANO"
+        }
+      ],
+      "expectedPromotionalAmount": "80.00",
+      "expectedDiscountedAmount": "70.00"
+    },
+    {
+      "name": "Educación Inicial, Especialización, UNT Posgrado",
+      "items": [
+        {
+          "itemId": "educacion-inicial-1",
+          "categoryCode": "EDUCACION",
+          "productTypeCode": "ESPECIALIZACION",
+          "issuerCode": "UNT",
+          "issuerVariantCode": "UNT_POSGRADO"
+        }
+      ],
+      "expectedPromotionalAmount": "80.00",
+      "expectedDiscountedAmount": "70.00"
+    },
+    {
+      "name": "Gestión Pública, Curso, UNT Posgrado",
+      "items": [
+        {
+          "itemId": "gestion-publica-1",
+          "categoryCode": "GESTION_PUBLICA",
+          "productTypeCode": "CURSO",
+          "issuerCode": "UNT",
+          "issuerVariantCode": "UNT_POSGRADO"
+        }
+      ],
+      "expectedPromotionalAmount": "80.00",
+      "expectedDiscountedAmount": "70.00"
+    },
+    {
+      "name": "Tres diplomados",
+      "items": [
+        {
+          "itemId": "dip-1",
+          "categoryCode": "DERECHO",
+          "productTypeCode": "DIPLOMADO",
+          "issuerCode": "CAC",
+          "issuerVariantCode": "CAC_DECANO"
+        },
+        {
+          "itemId": "dip-2",
+          "categoryCode": "DERECHO",
+          "productTypeCode": "DIPLOMADO",
+          "issuerCode": "CAC",
+          "issuerVariantCode": "CAC_DECANO"
+        },
+        {
+          "itemId": "dip-3",
+          "categoryCode": "DERECHO",
+          "productTypeCode": "DIPLOMADO",
+          "issuerCode": "CAC",
+          "issuerVariantCode": "CAC_DECANO"
+        }
+      ],
+      "expectedPromotionalAmount": "210.00",
+      "expectedDiscountedAmount": "210.00"
+    },
+    {
+      "name": "Curso de capacitación mapeado a curso",
+      "items": [
+        {
+          "itemId": "capacitacion-1",
+          "categoryCode": "GESTION_PUBLICA",
+          "productTypeCode": "CURSO_CAPACITACION",
+          "issuerCode": "UNT",
+          "issuerVariantCode": "UNT_POSGRADO"
+        }
+      ],
+      "expectedPromotionalAmount": "80.00",
+      "expectedDiscountedAmount": "70.00"
+    }
+  ]
+}

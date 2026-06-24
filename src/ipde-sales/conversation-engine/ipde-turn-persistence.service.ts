@@ -280,6 +280,57 @@ export class IpdeTurnPersistenceService {
         }
       }
 
+      for (const issuer of plan.issuerMutations) {
+        const items = await transaction.ipdeOrderItem.findMany({
+          where: {
+            tenantId: context.input.tenantId,
+            orderId: order.id,
+            status: { not: IpdeOrderItemStatus.REMOVED },
+          },
+        });
+        const target = normalizeCatalogText(issuer.targetReference ?? '');
+        for (const item of items) {
+          const subjectMatches =
+            issuer.appliesTo === 'SUBJECT' &&
+            item.subjectRequestId &&
+            [...subjectIds.entries()].some(
+              ([name, id]) => id === item.subjectRequestId && name === target,
+            );
+          const topicMatches =
+            issuer.appliesTo === 'TOPIC' && item.normalizedTopicName === target;
+          if (issuer.appliesTo !== 'ALL' && !subjectMatches && !topicMatches) {
+            continue;
+          }
+          const hasIssuer = Boolean(item.issuerCode || item.issuerVariantCode);
+          if (hasIssuer && !issuer.correctionExplicit) continue;
+          if (
+            item.issuerCode === issuer.issuerCode &&
+            item.issuerVariantCode === issuer.issuerVariantCode
+          ) {
+            continue;
+          }
+          await transaction.ipdeOrderItem.update({
+            where: { id: item.id },
+            data: {
+              issuerCode: issuer.issuerCode,
+              issuerVariantCode: issuer.issuerVariantCode,
+              status:
+                item.status === IpdeOrderItemStatus.CONFIRMED
+                  ? IpdeOrderItemStatus.DRAFT
+                  : item.status,
+              confirmedAt:
+                item.status === IpdeOrderItemStatus.CONFIRMED
+                  ? null
+                  : item.confirmedAt,
+            },
+          });
+          changes.push({
+            type: 'ISSUER_SELECTION_SET',
+            orderItemId: item.id,
+          });
+        }
+      }
+
       if (
         plan.nameMutation?.confirmExisting &&
         order.fullName &&
@@ -302,6 +353,29 @@ export class IpdeTurnPersistenceService {
             },
           });
           changes.push({ type: 'FULL_NAME_SET', orderId: order.id });
+        }
+      }
+
+      if (plan.quoteMutation) {
+        const amount = new Prisma.Decimal(plan.quoteMutation.amount);
+        const quoteConfirmed = Boolean(order.quoteConfirmedAt);
+        const maySetQuote =
+          !quoteConfirmed || plan.quoteMutation.correctionExplicit;
+        const sameAmount = order.quotedAmount?.equals(amount) ?? false;
+        const sameCurrency =
+          order.currencyCode === plan.quoteMutation.currencyCode;
+        if (maySetQuote && (!sameAmount || !sameCurrency)) {
+          order = await transaction.ipdeOrder.update({
+            where: { id: order.id },
+            data: {
+              quotedAmount: amount,
+              currencyCode: plan.quoteMutation.currencyCode,
+              quoteConfirmedAt: plan.quoteMutation.confirmed
+                ? new Date()
+                : null,
+            },
+          });
+          changes.push({ type: 'QUOTE_SET', orderId: order.id });
         }
       }
     }

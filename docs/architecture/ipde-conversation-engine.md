@@ -15,11 +15,11 @@ El motor sí puede:
 - interpretar una vez el mensaje con el servicio del Bloque 3;
 - resolver catálogo o selecciones con el servicio del Bloque 4;
 - crear o recuperar un pedido activo solo cuando existe relevancia comercial;
-- persistir materias, listas presentadas, selecciones, productos y nombre;
+- persistir materias, listas presentadas, selecciones, productos, emisor y nombre;
 - pausar la automatización cuando el usuario pide una persona;
 - producir acciones salientes estrictas y borradores deterministas.
 
-El motor no calcula precios, valida pagos, procesa comprobantes, decide promociones, valida emisores, genera o envía archivos, usa búsqueda web ni modifica `UsageDaily`. Tampoco introduce controllers, endpoints, jobs, cron, cambios de Prisma o integración con `WhatsappService`.
+El motor calcula precios únicamente mediante la configuración manual de pricing del Bloque 7. No valida pagos, procesa comprobantes, envía medios de pago, genera o envía archivos, usa búsqueda web ni modifica `UsageDaily`. La validación comercial de emisores pertenece al módulo de configuración de IPDE. Tampoco introduce controllers, endpoints, jobs, cron, cambios de Prisma o integración con `WhatsappService`.
 
 ## Flujo
 
@@ -91,7 +91,7 @@ La creación y asignación del pedido activo ocurre dentro de la misma transacci
 
 Los datos adelantados se conservan. Por ejemplo, un nombre o producto recibido junto a una materia puede persistirse sin volver a preguntarse, aunque la lista de temas continúe siendo el siguiente paso visible.
 
-La confirmación final del pedido solo puede proponerse si existen temas activos, todos tienen producto y emisor persistidos, y el nombre está confirmado. Este bloque no persiste nuevas preferencias de emisor porque su configuración comercial continúa pendiente; por eso la acción `ASK_ISSUER_VARIANT` declara `configurationPending: true` y no inventa instituciones ni documentos.
+La confirmación final del pedido solo puede proponerse si existen temas activos, todos tienen producto y emisor persistidos, y el nombre está confirmado. `ASK_ISSUER_VARIANT` incluye la recomendación y las alternativas validadas del Bloque 6 con `configurationPending: false`. La recomendación nunca se aplica automáticamente; una preferencia aceptada se valida contra todos los ítems y recién entonces se persiste. `configurationPending: true` queda como fallback defensivo si el motor no puede obtener una recomendación configurada.
 
 ## Transiciones controladas
 
@@ -115,11 +115,12 @@ Estas rutas evitan transiciones intermedias artificiales como `TOPIC_LIST_READY 
 - agrega temas o restaura ítems `REMOVED` por la clave única normalizada;
 - marca la selección de materia como completa;
 - aplica productos por todos los temas, materia o tema específico;
+- aplica una preferencia de emisor validada sin sobrescribir selecciones previas;
 - evita sobrescribir datos existentes salvo corrección inequívoca;
 - captura el nombre sin confirmarlo o confirma el nombre pendiente;
 - actualiza una sola vez la versión del estado y, si corresponde, su etapa.
 
-Una corrección explícita de producto confirmado vuelve el ítem a `DRAFT` y limpia su confirmación. Una corrección explícita de nombre reemplaza el valor y obliga a confirmarlo nuevamente. El nombre nunca aparece dentro de `appliedChanges` ni en logs.
+Una corrección explícita de producto o emisor confirmado vuelve el ítem a `DRAFT` y limpia su confirmación. Una corrección explícita de nombre reemplaza el valor y obliga a confirmarlo nuevamente. El nombre nunca aparece dentro de `appliedChanges` ni en logs.
 
 ## Concurrencia e idempotencia razonable
 
@@ -134,13 +135,14 @@ Todas las acciones pasan por `IpdeOutboundActionSchema`. Entre ellas están:
 - preguntas de materia, tema, producto, emisor y nombre;
 - presentación de lista con exactamente 25 temas;
 - confirmación de temas o nombre;
+- oferta tipada de metadatos de modelos referenciales;
 - solicitud de revisión humana;
 - ausencia explícita de respuesta automatizada;
 - intención comercial diferida.
 
 `IpdeResponseCopyService` genera texto breve, cálido y determinista. Cada lista se numera del 1 al 25 y se divide sin partir temas. `IPDE_WHATSAPP_TEXT_CHUNK_MAX_CHARS` acepta entre 500 y 4000, con 3000 por defecto. La introducción vive en el primer fragmento y la instrucción de selección en el último.
 
-Las intenciones `PRICE`, `DISCOUNT`, `PROMOTION`, `MODEL_PDF`, `PAYMENT_METHODS` y `PAYMENT_PROOF_MENTION` se conservan como `DEFERRED_COMMERCIAL_REQUEST`. Esta acción no contiene respuesta inventada ni activa capacidades fuera del bloque.
+Las intenciones `PRICE`, `DISCOUNT` y parte de `PROMOTION` se resuelven cuando el pedido proyectado tiene tema, producto, emisor y variante, y existe una regla de pricing activa. El motor produce `QUOTE_PRICE`, `QUOTE_DISCOUNT` o `PRICE_NOT_AVAILABLE`, y persiste `quotedAmount` sin confirmar la cotización. No expone `minimumAuthorizedAmount`. `PAYMENT_METHODS` se conserva como `DEFERRED_COMMERCIAL_REQUEST` con razón `PAYMENT_METHODS_NOT_CONFIGURED`, y `PAYMENT_PROOF_MENTION` sigue diferido. `MODEL_PDF` produce `OFFER_MODEL_PDF_OPTIONS` cuando el pedido tiene producto y emisor completos y existe un modelo activo; la acción omite toda ubicación interna y no envía el archivo. Si la combinación completa no está configurada, se difiere con `MEDIA_NOT_CONFIGURED`.
 
 ## Resultado, métricas y logs
 
@@ -151,7 +153,7 @@ El resultado expone solamente resúmenes seguros:
 - resumen de entendimiento y catálogo;
 - cambios aplicados por ID;
 - acciones salientes validadas;
-- intenciones diferidas;
+- intenciones diferidas o resueltas por pricing manual;
 - llamadas OpenAI, tokens, fallback, latencia y reintentos.
 
 No devuelve objetos Prisma completos. Los logs usan hashes truncados para tenant y turno, etapas, conteos, intenciones, latencia y códigos seguros. No registran mensaje, nombre, temas, prompts, historial ni secretos.

@@ -5,13 +5,26 @@ import {
   IpdeSubjectRequestStatus,
 } from '@prisma/client';
 import {
-  PRODUCT_TYPES,
   ProductType,
   SubjectCatalogEntry,
 } from '../../catalog/domain/catalog.types';
 import { normalizeCatalogText } from '../../catalog/utils/normalize-catalog-text';
 import { IpdeStageTransitionPolicy } from '../domain/ipde-stage-transition.policy';
 import { IpdeMessageExtraction } from '../understanding/ipde-understanding.types';
+import { IpdeCommercialConfigService } from '../commercial-config/ipde-commercial-config.service';
+import {
+  IpdeCommercialConfigError,
+  IpdeCommercialSelectionError,
+} from '../commercial-config/ipde-commercial-config.errors';
+import { IpdeIssuerSelectionService } from '../commercial-config/ipde-issuer-selection.service';
+import { IpdeModelPdfSelectionService } from '../commercial-config/ipde-model-pdf-selection.service';
+import { IpdeOrderPricingProjectionService } from '../pricing/ipde-order-pricing-projection.service';
+import {
+  IpdePricingConfigError,
+  IpdePricingSelectionError,
+} from '../pricing/ipde-pricing.errors';
+import { IpdePricingService } from '../pricing/ipde-pricing.service';
+import { IpdeQuoteOrderResult } from '../pricing/ipde-pricing.types';
 import {
   IpdeDeferredIntent,
   IpdeOutboundAction,
@@ -21,8 +34,20 @@ import { IpdeResponseCopyService } from './ipde-response-copy.service';
 import {
   IpdeConversationTurnPlan,
   IpdeItemMutation,
+  IpdeQuoteMutation,
   IpdeTurnPlanningInput,
 } from './ipde-conversation-turn.types';
+
+type ProjectedItem = {
+  itemId: string;
+  topicName: string;
+  normalizedTopicName: string;
+  subjectNormalizedName?: string;
+  categoryCode: string | null;
+  productTypeCode: string | null;
+  issuerCode: string | null;
+  issuerVariantCode: string | null;
+};
 
 @Injectable()
 export class IpdeConversationPlannerService {
@@ -30,6 +55,11 @@ export class IpdeConversationPlannerService {
     private readonly nextField: IpdeNextRequiredFieldPolicy,
     private readonly copy: IpdeResponseCopyService,
     private readonly transitions: IpdeStageTransitionPolicy,
+    private readonly commercial: IpdeCommercialConfigService,
+    private readonly issuerSelection: IpdeIssuerSelectionService,
+    private readonly modelPdfs: IpdeModelPdfSelectionService,
+    private readonly pricing: IpdePricingService,
+    private readonly pricingProjection: IpdeOrderPricingProjectionService,
   ) {}
 
   isCommerciallyRelevant(extraction: IpdeMessageExtraction): boolean {
@@ -50,9 +80,16 @@ export class IpdeConversationPlannerService {
       extraction.subjects.length > 0 ||
       extraction.topicSelections.length > 0 ||
       extraction.productSelections.length > 0 ||
+      extraction.issuerPreference.confidence > 0 ||
       extraction.fullNameCandidate !== null ||
       extraction.requestPath === 'CATALOG_LIST' ||
-      extraction.commercialSignals.appearsReadyToBuy
+      extraction.commercialSignals.appearsReadyToBuy ||
+      extraction.commercialSignals.asksForPrice ||
+      extraction.commercialSignals.asksForDiscount ||
+      extraction.primaryIntent === 'REQUEST_PRICE' ||
+      extraction.primaryIntent === 'REQUEST_DISCOUNT' ||
+      extraction.primaryIntent === 'REQUEST_PROMOTION' ||
+      extraction.primaryIntent === 'REQUEST_PAYMENT_METHODS'
     );
   }
 
@@ -61,7 +98,7 @@ export class IpdeConversationPlannerService {
     const commercial = this.isCommerciallyRelevant(extraction);
     const ensureOrder = commercial || context.order !== null;
     const deferredIntents = this.deferredIntents(extraction);
-    const critical = this.criticalClarification(extraction, catalogResolution);
+    let critical = this.criticalClarification(extraction, catalogResolution);
     const resolvedEntries =
       catalogResolution?.subjects.flatMap((subject) =>
         subject.catalogEntry ? [subject.catalogEntry] : [],
@@ -93,6 +130,48 @@ export class IpdeConversationPlannerService {
       targetReference: selection.targetReference ?? undefined,
       correctionExplicit,
     }));
+    if (!critical) {
+      critical = this.productClarification(
+        input,
+        subjectMutations,
+        itemMutations,
+        productMutations,
+      );
+    }
+    const preIssuerItems = this.buildProjectedItems(
+      input,
+      subjectMutations,
+      itemMutations,
+      productMutations,
+      [],
+    );
+    const issuerResolution = !critical
+      ? this.issuerSelection.resolve({
+          tenantCode: 'IPDE',
+          preference: extraction.issuerPreference,
+          itemContexts: preIssuerItems.map((item) => ({
+            categoryCode: item.categoryCode,
+            productTypeCode: item.productTypeCode,
+          })),
+        })
+      : { kind: 'NONE' as const };
+    if (issuerResolution.kind === 'CLARIFICATION') {
+      critical = {
+        reason: issuerResolution.reason,
+        candidates: issuerResolution.candidates,
+      };
+    }
+    const issuerMutations =
+      issuerResolution.kind === 'VALID'
+        ? [
+            {
+              issuerCode: issuerResolution.issuerCode,
+              issuerVariantCode: issuerResolution.issuerVariantCode,
+              appliesTo: 'ALL' as const,
+              correctionExplicit,
+            },
+          ]
+        : [];
     const nameMutation = extraction.fullNameCandidate
       ? {
           value: extraction.fullNameCandidate,
@@ -108,10 +187,16 @@ export class IpdeConversationPlannerService {
           }
         : null;
 
-    const projected = this.project(
+    const projectedItems = this.buildProjectedItems(
       input,
+      subjectMutations,
       itemMutations,
       productMutations,
+      issuerMutations,
+    );
+    const projected = this.project(
+      input,
+      projectedItems,
       nameMutation,
       completedSubjectNames,
       shouldPresentLists,
@@ -140,15 +225,70 @@ export class IpdeConversationPlannerService {
           context,
           resolvedEntries,
           itemMutations,
+          projectedItems,
           nameMutation?.value,
         ),
       );
     }
 
-    if (deferredIntents.length > 0) {
+    const pricingResolution = this.resolvePricingActions({
+      actions,
+      deferredIntents,
+      projectedItems,
+      correctionExplicit,
+    });
+
+    const modelRequested = deferredIntents.includes('MODEL_PDF');
+    let modelOffered = false;
+    const canResolveModels =
+      modelRequested &&
+      !critical &&
+      !shouldPresentLists &&
+      ![
+        'SUBJECT',
+        'TOPIC_SELECTION',
+        'PRODUCT_TYPE',
+        'ISSUER_VARIANT',
+      ].includes(next);
+    if (canResolveModels) {
+      const assets = this.modelPdfs.selectForItems({
+        tenantCode: 'IPDE',
+        items: projectedItems,
+      });
+      if (assets.length > 0) {
+        actions.unshift(this.copy.offerModelPdfOptions(assets));
+        modelOffered = true;
+      } else {
+        actions.push({
+          type: 'DEFERRED_COMMERCIAL_REQUEST',
+          intents: ['MODEL_PDF'],
+          reason: 'MEDIA_NOT_CONFIGURED',
+        });
+      }
+    }
+
+    const unresolvedDeferredIntents = deferredIntents.filter(
+      (intent) =>
+        !pricingResolution.handledIntents.has(intent) &&
+        !(modelOffered && intent === 'MODEL_PDF'),
+    );
+    const paymentMethodDeferred = unresolvedDeferredIntents.filter(
+      (intent) => intent === 'PAYMENT_METHODS',
+    );
+    if (paymentMethodDeferred.length > 0) {
       actions.push({
         type: 'DEFERRED_COMMERCIAL_REQUEST',
-        intents: deferredIntents,
+        intents: paymentMethodDeferred,
+        reason: 'PAYMENT_METHODS_NOT_CONFIGURED',
+      });
+    }
+    const genericDeferred = unresolvedDeferredIntents.filter(
+      (intent) => intent !== 'MODEL_PDF' && intent !== 'PAYMENT_METHODS',
+    );
+    if (genericDeferred.length > 0) {
+      actions.push({
+        type: 'DEFERRED_COMMERCIAL_REQUEST',
+        intents: genericDeferred,
         reason: 'OUT_OF_SCOPE_FOR_BLOCK_5',
       });
     }
@@ -165,10 +305,12 @@ export class IpdeConversationPlannerService {
       itemMutations,
       completedSubjectNames,
       productMutations,
+      issuerMutations,
       nameMutation,
+      quoteMutation: pricingResolution.quoteMutation,
       targetStage: this.safeTargetStage(context.state.stage, desiredStage),
       outboundActions: actions,
-      deferredIntents,
+      deferredIntents: unresolvedDeferredIntents,
     };
   }
 
@@ -223,31 +365,36 @@ export class IpdeConversationPlannerService {
     return [...unique.values()];
   }
 
-  private project(
+  private buildProjectedItems(
     input: IpdeTurnPlanningInput,
+    subjectMutations: IpdeConversationTurnPlan['subjectMutations'],
     newItems: IpdeItemMutation[],
     productMutations: IpdeConversationTurnPlan['productMutations'],
-    nameMutation: IpdeConversationTurnPlan['nameMutation'],
-    completedSubjectNames: string[],
-    presentsList: boolean,
-    hasCriticalClarification: boolean,
-  ) {
+    issuerMutations: IpdeConversationTurnPlan['issuerMutations'],
+  ): ProjectedItem[] {
     const order = input.context.order;
     const subjectById = new Map(
-      order?.subjectRequests.map((subject) => [
-        subject.id,
+      order?.subjectRequests.map((subject) => [subject.id, subject]) ?? [],
+    );
+    const categoryByName = new Map(
+      subjectMutations.map((subject) => [
         subject.normalizedName,
-      ]) ?? [],
+        subject.categoryCode ?? null,
+      ]),
     );
     const existingItems =
       order?.items
         .filter((item) => item.status !== IpdeOrderItemStatus.REMOVED)
         .map((item) => ({
+          itemId: item.id,
           topicName: item.topicName,
           normalizedTopicName: item.normalizedTopicName,
           subjectNormalizedName: item.subjectRequestId
-            ? subjectById.get(item.subjectRequestId)
+            ? subjectById.get(item.subjectRequestId)?.normalizedName
             : undefined,
+          categoryCode: item.subjectRequestId
+            ? (subjectById.get(item.subjectRequestId)?.categoryCode ?? null)
+            : null,
           productTypeCode: item.productTypeCode,
           issuerCode: item.issuerCode,
           issuerVariantCode: item.issuerVariantCode,
@@ -259,7 +406,16 @@ export class IpdeConversationPlannerService {
       if (!items.has(item.normalizedTopicName)) {
         items.set(item.normalizedTopicName, {
           ...item,
+          itemId: item.normalizedTopicName,
           subjectNormalizedName: item.subjectNormalizedName,
+          categoryCode: item.subjectNormalizedName
+            ? (categoryByName.get(item.subjectNormalizedName) ??
+              order?.subjectRequests.find(
+                (subject) =>
+                  subject.normalizedName === item.subjectNormalizedName,
+              )?.categoryCode ??
+              null)
+            : null,
           productTypeCode: null,
           issuerCode: null,
           issuerVariantCode: null,
@@ -279,11 +435,47 @@ export class IpdeConversationPlannerService {
             normalizeCatalogText(product.targetReference) ===
               item.subjectNormalizedName)
         ) {
+          if (item.productTypeCode && !product.correctionExplicit) continue;
           item.productTypeCode = product.productTypeCode;
         }
       }
     }
-    const values = [...items.values()];
+    for (const issuer of issuerMutations) {
+      for (const item of items.values()) {
+        if (
+          issuer.appliesTo === 'ALL' ||
+          (issuer.appliesTo === 'TOPIC' &&
+            issuer.targetReference &&
+            normalizeCatalogText(issuer.targetReference) ===
+              item.normalizedTopicName) ||
+          (issuer.appliesTo === 'SUBJECT' &&
+            issuer.targetReference &&
+            normalizeCatalogText(issuer.targetReference) ===
+              item.subjectNormalizedName)
+        ) {
+          if (
+            (item.issuerCode || item.issuerVariantCode) &&
+            !issuer.correctionExplicit
+          ) {
+            continue;
+          }
+          item.issuerCode = issuer.issuerCode;
+          item.issuerVariantCode = issuer.issuerVariantCode;
+        }
+      }
+    }
+    return [...items.values()];
+  }
+
+  private project(
+    input: IpdeTurnPlanningInput,
+    values: ProjectedItem[],
+    nameMutation: IpdeConversationTurnPlan['nameMutation'],
+    completedSubjectNames: string[],
+    presentsList: boolean,
+    hasCriticalClarification: boolean,
+  ) {
+    const order = input.context.order;
     const hasPendingTopicList =
       presentsList ||
       Boolean(
@@ -303,7 +495,6 @@ export class IpdeConversationPlannerService {
     return {
       hasCriticalClarification,
       hasSubjectOrTopics:
-        newItems.length > 0 ||
         input.extraction.subjects.length > 0 ||
         Boolean(order?.subjectRequests.length) ||
         values.length > 0,
@@ -328,6 +519,7 @@ export class IpdeConversationPlannerService {
     context: IpdeTurnPlanningInput['context'],
     entries: SubjectCatalogEntry[],
     newItems: IpdeItemMutation[],
+    projectedItems: ProjectedItem[],
     pendingName?: string,
   ): IpdeOutboundAction {
     const activeTopicNames = [
@@ -354,11 +546,41 @@ export class IpdeConversationPlannerService {
         );
       case 'PRODUCT_TYPE':
         return this.copy.askProductType(
-          this.allowedProducts(entries),
+          this.allowedProducts(context, entries),
           activeTopicNames,
         );
-      case 'ISSUER_VARIANT':
-        return this.copy.askIssuerVariant();
+      case 'ISSUER_VARIANT': {
+        const categoryCode =
+          projectedItems.find((item) => item.categoryCode)?.categoryCode ??
+          entries[0]?.category ??
+          context.order?.subjectRequests[0]?.categoryCode ??
+          null;
+        const productTypeCode =
+          projectedItems.find((item) => item.productTypeCode)
+            ?.productTypeCode ?? null;
+        try {
+          const recommended = this.commercial.getRecommendedIssuerVariant({
+            tenantCode: 'IPDE',
+            categoryCode,
+            productTypeCode,
+          });
+          const options = this.commercial.getIssuerOptions({
+            tenantCode: 'IPDE',
+            categoryCode,
+            productTypeCode,
+          });
+          return this.copy.askIssuerVariant({
+            categoryCode,
+            recommended,
+            options,
+          });
+        } catch (error) {
+          if (error instanceof IpdeCommercialConfigError) {
+            return this.copy.askIssuerVariant();
+          }
+          throw error;
+        }
+      }
       case 'FULL_NAME':
         return this.copy.askFullName();
       case 'FULL_NAME_CONFIRMATION':
@@ -394,11 +616,86 @@ export class IpdeConversationPlannerService {
       : current;
   }
 
-  private allowedProducts(entries: SubjectCatalogEntry[]): ProductType[] {
-    const values = new Set(
-      entries.flatMap((entry) => entry.allowedProductTypes),
+  private allowedProducts(
+    context: IpdeTurnPlanningInput['context'],
+    entries: SubjectCatalogEntry[],
+  ): ProductType[] {
+    const categories = new Set<string | null>([
+      ...entries.map((entry) => entry.category),
+      ...(context.order?.subjectRequests.map(
+        (subject) => subject.categoryCode,
+      ) ?? []),
+    ]);
+    if (categories.size === 0) categories.add(null);
+    let values: Set<ProductType> | null = null;
+    for (const categoryCode of categories) {
+      const products = new Set(
+        this.commercial.getAllowedProductTypesForCategory({
+          tenantCode: 'IPDE',
+          categoryCode,
+        }),
+      );
+      values = values
+        ? new Set([...values].filter((product) => products.has(product)))
+        : products;
+    }
+    return values ? [...values] : [];
+  }
+
+  private productClarification(
+    input: IpdeTurnPlanningInput,
+    subjects: IpdeConversationTurnPlan['subjectMutations'],
+    itemMutations: IpdeConversationTurnPlan['itemMutations'],
+    products: IpdeConversationTurnPlan['productMutations'],
+  ): { reason: string; candidates: string[] } | null {
+    if (products.length === 0) return null;
+    const items = this.buildProjectedItems(
+      input,
+      subjects,
+      itemMutations,
+      [],
+      [],
     );
-    return values.size > 0 ? [...values] : [...PRODUCT_TYPES];
+    for (const product of products) {
+      const target = normalizeCatalogText(product.targetReference ?? '');
+      const targetedItems = items.filter(
+        (item) =>
+          product.appliesTo === 'ALL' ||
+          (product.appliesTo === 'SUBJECT' &&
+            item.subjectNormalizedName === target) ||
+          (product.appliesTo === 'TOPIC' &&
+            item.normalizedTopicName === target),
+      );
+      if (product.appliesTo !== 'ALL' && targetedItems.length === 0) {
+        return { reason: 'AMBIGUOUS_PRODUCT_TYPE', candidates: [] };
+      }
+      const categories = new Set<string | null>(
+        targetedItems.map((item) => item.categoryCode),
+      );
+      if (categories.size === 0) {
+        subjects.forEach((subject) =>
+          categories.add(subject.categoryCode ?? null),
+        );
+      }
+      if (categories.size === 0) categories.add(null);
+      for (const categoryCode of categories) {
+        try {
+          this.commercial.validateProductSelection({
+            tenantCode: 'IPDE',
+            categoryCode,
+            productTypeCode: product.productTypeCode,
+          });
+        } catch (error) {
+          if (!(error instanceof IpdeCommercialSelectionError)) throw error;
+          const allowed = this.commercial.getAllowedProductTypesForCategory({
+            tenantCode: 'IPDE',
+            categoryCode,
+          });
+          return { reason: error.code, candidates: allowed };
+        }
+      }
+    }
+    return null;
   }
 
   private criticalClarification(
@@ -471,5 +768,108 @@ export class IpdeConversationPlannerService {
     )
       values.add('PAYMENT_PROOF_MENTION');
     return [...values];
+  }
+
+  private resolvePricingActions(params: {
+    actions: IpdeOutboundAction[];
+    deferredIntents: IpdeDeferredIntent[];
+    projectedItems: ProjectedItem[];
+    correctionExplicit: boolean;
+  }): {
+    quoteMutation: IpdeQuoteMutation | null;
+    handledIntents: Set<IpdeDeferredIntent>;
+  } {
+    const handledIntents = new Set<IpdeDeferredIntent>();
+    const wantsPrice = params.deferredIntents.includes('PRICE');
+    const wantsPromotion = params.deferredIntents.includes('PROMOTION');
+    const wantsDiscount = params.deferredIntents.includes('DISCOUNT');
+    if (!wantsPrice && !wantsPromotion && !wantsDiscount) {
+      return { quoteMutation: null, handledIntents };
+    }
+
+    for (const intent of ['PRICE', 'PROMOTION', 'DISCOUNT'] as const) {
+      if (params.deferredIntents.includes(intent)) handledIntents.add(intent);
+    }
+
+    const quote = this.tryQuoteProjectedItems(params.projectedItems);
+    if (quote.kind === 'WAITING_FOR_DATA') {
+      return { quoteMutation: null, handledIntents };
+    }
+    if (quote.kind === 'NOT_AVAILABLE') {
+      params.actions.push(this.copy.priceNotAvailable(quote.reason));
+      return { quoteMutation: null, handledIntents };
+    }
+
+    if (wantsDiscount) {
+      const discount = this.pricing.quoteDiscount({
+        tenantCode: 'IPDE',
+        categoryCode: null,
+        items: this.pricingProjection.fromProjectedItems(params.projectedItems),
+      });
+      params.actions.unshift(this.copy.quoteDiscount(discount));
+      return {
+        quoteMutation: discount.discountAvailable
+          ? {
+              amount: discount.discountedAmount,
+              currencyCode: discount.currencyCode,
+              confirmed: false,
+              correctionExplicit: params.correctionExplicit,
+            }
+          : null,
+        handledIntents,
+      };
+    }
+
+    params.actions.unshift(this.copy.quotePrice(quote.quote));
+    return {
+      quoteMutation: {
+        amount: quote.quote.totalPromotionalAmount,
+        currencyCode: quote.quote.currencyCode,
+        confirmed: false,
+        correctionExplicit: params.correctionExplicit,
+      },
+      handledIntents,
+    };
+  }
+
+  private tryQuoteProjectedItems(projectedItems: ProjectedItem[]):
+    | { kind: 'QUOTED'; quote: IpdeQuoteOrderResult }
+    | {
+        kind: 'NOT_AVAILABLE';
+        reason: 'NO_PRICING_RULE' | 'PARTIAL_PRICING';
+      }
+    | { kind: 'WAITING_FOR_DATA' } {
+    if (projectedItems.length === 0) return { kind: 'WAITING_FOR_DATA' };
+    if (projectedItems.some((item) => !item.productTypeCode)) {
+      return { kind: 'WAITING_FOR_DATA' };
+    }
+    if (
+      projectedItems.some((item) => !item.issuerCode || !item.issuerVariantCode)
+    ) {
+      return { kind: 'WAITING_FOR_DATA' };
+    }
+    try {
+      const quote = this.pricing.quoteOrder({
+        tenantCode: 'IPDE',
+        categoryCode: null,
+        items: this.pricingProjection.fromProjectedItems(projectedItems),
+      });
+      if (quote.quoteStatus === 'QUOTED') {
+        return { kind: 'QUOTED', quote };
+      }
+      return {
+        kind: 'NOT_AVAILABLE',
+        reason:
+          quote.quoteStatus === 'PARTIAL'
+            ? 'PARTIAL_PRICING'
+            : 'NO_PRICING_RULE',
+      };
+    } catch (error) {
+      if (error instanceof IpdePricingSelectionError) {
+        return { kind: 'WAITING_FOR_DATA' };
+      }
+      if (error instanceof IpdePricingConfigError) throw error;
+      throw error;
+    }
   }
 }

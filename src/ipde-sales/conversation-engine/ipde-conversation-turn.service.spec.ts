@@ -101,7 +101,9 @@ function greetingPlan(): IpdeConversationTurnPlan {
     itemMutations: [],
     completedSubjectNames: [],
     productMutations: [],
+    issuerMutations: [],
     nameMutation: null,
+    quoteMutation: null,
     targetStage: IpdeConversationStage.UNDERSTANDING_REQUEST,
     outboundActions: [
       {

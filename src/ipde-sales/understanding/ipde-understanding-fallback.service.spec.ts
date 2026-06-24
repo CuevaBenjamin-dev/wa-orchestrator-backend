@@ -39,6 +39,37 @@ describe('IpdeUnderstandingFallbackService', () => {
     expect(result.productSelections[0]?.productTypeCode).toBe(expected);
   });
 
+  it.each([
+    ['Colegio de Abogados del Callao', 'CAC', 'CAC_DECANO'],
+    ['Unidad de Posgrado', 'UNT', 'UNT_POSGRADO'],
+    ['resolución directoral de la UNT', 'UNT', 'UNT_DIRECTORAL'],
+  ] as const)(
+    'maps the explicit issuer phrase %s without guessing another variant',
+    (message, issuerCode, variantCode) => {
+      const result = service.understand({
+        tenantCode: 'IPDE',
+        userMessage: `Prefiero ${message}`,
+      });
+
+      expect(result.issuerPreference).toMatchObject({
+        issuerCode,
+        variantCode,
+      });
+    },
+  );
+
+  it('keeps a bare UNT preference ambiguous', () => {
+    const result = service.understand({
+      tenantCode: 'IPDE',
+      userMessage: 'Prefiero UNT',
+    });
+
+    expect(result.issuerPreference).toMatchObject({
+      issuerCode: 'UNT',
+      variantCode: 'UNSPECIFIED',
+    });
+  });
+
   it('maps numeric selections only against presented lists', () => {
     const result = service.understand({
       tenantCode: 'IPDE',

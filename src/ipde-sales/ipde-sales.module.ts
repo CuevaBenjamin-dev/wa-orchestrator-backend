@@ -20,9 +20,16 @@ import { IpdeConversationTurnService } from './conversation-engine/ipde-conversa
 import { IpdeNextRequiredFieldPolicy } from './conversation-engine/ipde-next-required-field.policy';
 import { IpdeResponseCopyService } from './conversation-engine/ipde-response-copy.service';
 import { IpdeTurnPersistenceService } from './conversation-engine/ipde-turn-persistence.service';
+import { IpdeCommercialConfigModule } from './commercial-config/ipde-commercial-config.module';
+import { IpdePricingModule } from './pricing/ipde-pricing.module';
 
 @Module({
-  imports: [AiModule, CatalogModule],
+  imports: [
+    AiModule,
+    CatalogModule,
+    IpdeCommercialConfigModule,
+    IpdePricingModule,
+  ],
   providers: [
     IpdeCatalogResolutionService,
     IpdeFuzzyCatalogMatchService,

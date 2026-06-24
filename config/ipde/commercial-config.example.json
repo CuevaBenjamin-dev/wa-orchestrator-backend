@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "tenantCode": "IPDE",
+  "tenantDisplayName": "Instituto Peruano de Diplomados y Especializaciones",
+  "products": [
+    { "code": "DIPLOMADO", "active": true },
+    { "code": "ESPECIALIZACION", "active": true },
+    { "code": "CURSO", "active": true },
+    { "code": "CURSO_CAPACITACION", "active": true },
+    { "code": "CURSO_ACTUALIZACION", "active": true },
+    { "code": "CURSO_ESPECIALIZACION", "active": true }
+  ],
+  "issuers": [
+    {
+      "code": "CAC",
+      "displayName": "Colegio de Abogados del Callao",
+      "active": true,
+      "variants": [
+        {
+          "code": "CAC_DECANO",
+          "displayName": "Firma y sello del decano",
+          "description": "Emitido a nombre del Colegio de Abogados del Callao, con firma y sello del decano.",
+          "active": true,
+          "allowedProductTypes": [
+            "DIPLOMADO",
+            "ESPECIALIZACION",
+            "CURSO",
+            "CURSO_CAPACITACION",
+            "CURSO_ACTUALIZACION",
+            "CURSO_ESPECIALIZACION"
+          ],
+          "availableForCategories": [
+            "DERECHO",
+            "EDUCACION",
+            "GESTION_PUBLICA",
+            "SALUD",
+            "INGENIERIA",
+            "ADMINISTRACION",
+            "CONTABILIDAD",
+            "PSICOLOGIA",
+            "TECNOLOGIA",
+            "OTROS"
+          ]
+        }
+      ]
+    },
+    {
+      "code": "UNT",
+      "displayName": "Universidad Nacional de Trujillo",
+      "active": true,
+      "variants": [
+        {
+          "code": "UNT_POSGRADO",
+          "displayName": "Resolución de posgrado",
+          "description": "A nombre de la Universidad Nacional de Trujillo, con resolución de posgrado, firma y sello del director de la Unidad de Posgrado.",
+          "active": true,
+          "allowedProductTypes": [
+            "DIPLOMADO",
+            "ESPECIALIZACION",
+            "CURSO",
+            "CURSO_CAPACITACION",
+            "CURSO_ACTUALIZACION",
+            "CURSO_ESPECIALIZACION"
+          ],
+          "availableForCategories": [
+            "DERECHO",
+            "EDUCACION",
+            "GESTION_PUBLICA",
+            "SALUD",
+            "INGENIERIA",
+            "ADMINISTRACION",
+            "CONTABILIDAD",
+            "PSICOLOGIA",
+            "TECNOLOGIA",
+            "OTROS"
+          ]
+        },
+        {
+          "code": "UNT_DIRECTORAL",
+          "displayName": "Resolución directoral",
+          "description": "A nombre de la Universidad Nacional de Trujillo, con número de resolución directoral.",
+          "active": true,
+          "allowedProductTypes": [
+            "DIPLOMADO",
+            "ESPECIALIZACION",
+            "CURSO",
+            "CURSO_CAPACITACION",
+            "CURSO_ACTUALIZACION",
+            "CURSO_ESPECIALIZACION"
+          ],
+          "availableForCategories": [
+            "DERECHO",
+            "EDUCACION",
+            "GESTION_PUBLICA",
+            "SALUD",
+            "INGENIERIA",
+            "ADMINISTRACION",
+            "CONTABILIDAD",
+            "PSICOLOGIA",
+            "TECNOLOGIA",
+            "OTROS"
+          ]
+        }
+      ]
+    }
+  ],
+  "categoryRules": [
+    {
+      "categoryCode": "DERECHO",
+      "allowedProductTypes": ["DIPLOMADO", "ESPECIALIZACION", "CURSO"],
+      "recommendation": {
+        "issuerCode": "CAC",
+        "variantCode": "CAC_DECANO",
+        "autoApply": false
+      }
+    },
+    {
+      "categoryCode": "EDUCACION",
+      "allowedProductTypes": ["DIPLOMADO", "ESPECIALIZACION", "CURSO"],
+      "recommendation": {
+        "issuerCode": "UNT",
+        "variantCode": "UNT_POSGRADO",
+        "autoApply": false
+      }
+    },
+    {
+      "categoryCode": "GESTION_PUBLICA",
+      "allowedProductTypes": [
+        "DIPLOMADO",
+        "ESPECIALIZACION",
+        "CURSO",
+        "CURSO_CAPACITACION",
+        "CURSO_ACTUALIZACION",
+        "CURSO_ESPECIALIZACION"
+      ],
+      "recommendation": {
+        "issuerCode": "UNT",
+        "variantCode": "UNT_POSGRADO",
+        "autoApply": false
+      }
+    }
+  ],
+  "defaultRule": {
+    "allowedProductTypes": [
+      "DIPLOMADO",
+      "ESPECIALIZACION",
+      "CURSO",
+      "CURSO_CAPACITACION",
+      "CURSO_ACTUALIZACION",
+      "CURSO_ESPECIALIZACION"
+    ],
+    "recommendation": {
+      "issuerCode": "UNT",
+      "variantCode": "UNT_POSGRADO",
+      "autoApply": false
+    }
+  }
+}

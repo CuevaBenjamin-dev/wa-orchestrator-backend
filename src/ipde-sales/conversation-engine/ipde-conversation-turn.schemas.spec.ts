@@ -56,4 +56,25 @@ describe('IPDE conversation turn schemas', () => {
       }),
     ).toThrow();
   });
+
+  it('accepts pricing actions without exposing the minimum authorized amount', () => {
+    const action = IpdeOutboundActionSchema.parse({
+      type: 'QUOTE_PRICE',
+      currencyCode: 'PEN',
+      totalRegularAmount: '120.00',
+      totalPromotionalAmount: '80.00',
+      promotionLabel: 'Promoción vigente',
+      appliedRuleIds: ['PRICE_DERECHO_DIPLOMADO_CAC_DECANO_1'],
+      messageDraft:
+        'Perfecto. Para la opción seleccionada, el precio promocional total es S/ 80.',
+    });
+    expect(JSON.stringify(action)).not.toMatch(/minimumAuthorizedAmount/);
+
+    expect(() =>
+      IpdeOutboundActionSchema.parse({
+        ...action,
+        minimumAuthorizedAmount: '70.00',
+      }),
+    ).toThrow();
+  });
 });

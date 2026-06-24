@@ -61,10 +61,14 @@ const AppliedChangeSchema = z.discriminatedUnion('type', [
   z
     .object({ type: z.literal('PRODUCT_TYPE_SET'), orderItemId: IdSchema })
     .strict(),
+  z
+    .object({ type: z.literal('ISSUER_SELECTION_SET'), orderItemId: IdSchema })
+    .strict(),
   z.object({ type: z.literal('FULL_NAME_SET'), orderId: IdSchema }).strict(),
   z
     .object({ type: z.literal('FULL_NAME_CONFIRMED'), orderId: IdSchema })
     .strict(),
+  z.object({ type: z.literal('QUOTE_SET'), orderId: IdSchema }).strict(),
   z
     .object({
       type: z.literal('STAGE_TRANSITIONED'),

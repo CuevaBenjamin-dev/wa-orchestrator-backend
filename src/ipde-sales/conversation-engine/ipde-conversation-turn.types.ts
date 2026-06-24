@@ -54,13 +54,30 @@ export interface IpdeNameMutation {
   correctionExplicit: boolean;
 }
 
+export interface IpdeIssuerMutation {
+  issuerCode: string;
+  issuerVariantCode: string;
+  appliesTo: 'ALL' | 'SUBJECT' | 'TOPIC';
+  targetReference?: string;
+  correctionExplicit: boolean;
+}
+
+export interface IpdeQuoteMutation {
+  amount: string;
+  currencyCode: 'PEN';
+  confirmed: false;
+  correctionExplicit: boolean;
+}
+
 export interface IpdeConversationTurnPlan {
   ensureOrder: boolean;
   subjectMutations: IpdeSubjectMutation[];
   itemMutations: IpdeItemMutation[];
   completedSubjectNames: string[];
   productMutations: IpdeProductMutation[];
+  issuerMutations: IpdeIssuerMutation[];
   nameMutation: IpdeNameMutation | null;
+  quoteMutation: IpdeQuoteMutation | null;
   targetStage: IpdeConversationStage;
   outboundActions: IpdeOutboundAction[];
   deferredIntents: IpdeDeferredIntent[];

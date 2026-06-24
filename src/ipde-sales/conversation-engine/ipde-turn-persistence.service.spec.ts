@@ -65,7 +65,9 @@ function plan(
     itemMutations: [],
     completedSubjectNames: [],
     productMutations: [],
+    issuerMutations: [],
     nameMutation: null,
+    quoteMutation: null,
     targetStage: IpdeConversationStage.NEW,
     outboundActions: [],
     deferredIntents: [],
@@ -263,6 +265,229 @@ describe('IpdeTurnPersistenceService', () => {
         plan({ targetStage: IpdeConversationStage.UNDERSTANDING_REQUEST }),
       ),
     ).rejects.toBeInstanceOf(ConcurrentIpdeStateUpdateError);
+  });
+
+  it('persists an accepted issuer preference on the tenant order items', async () => {
+    const transaction = transactionMock();
+    const activeState = { ...state(), activeOrderId: 'order-1' };
+    const activeOrder = {
+      id: 'order-1',
+      tenantId: 'tenant-1',
+      conversationStateId: 'state-1',
+      status: IpdeOrderStatus.DRAFT,
+      paymentStatus: IpdePaymentStatus.NOT_REQUESTED,
+      fullName: null,
+      normalizedFullName: null,
+      fullNameConfirmedAt: null,
+      currencyCode: 'PEN',
+      quotedAmount: null,
+      quoteConfirmedAt: null,
+      confirmedAt: null,
+      readyForIssuanceAt: null,
+      completedAt: null,
+      cancelledAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const item = {
+      id: 'item-1',
+      tenantId: 'tenant-1',
+      orderId: 'order-1',
+      subjectRequestId: null,
+      catalogTopicId: null,
+      topicName: 'Tema comercial',
+      normalizedTopicName: 'tema comercial',
+      productTypeCode: 'DIPLOMADO',
+      issuerCode: null,
+      issuerVariantCode: null,
+      status: IpdeOrderItemStatus.DRAFT,
+      confirmedAt: null,
+      removedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    transaction.ipdeConversationState.findFirst.mockResolvedValue(activeState);
+    transaction.ipdeOrder.findFirst.mockResolvedValue(activeOrder);
+    transaction.ipdeOrderItem.findMany.mockResolvedValue([item]);
+    const service = serviceWith(transaction);
+
+    const result = await service.apply(
+      context(),
+      plan({
+        issuerMutations: [
+          {
+            issuerCode: 'CAC',
+            issuerVariantCode: 'CAC_DECANO',
+            appliesTo: 'ALL',
+            correctionExplicit: false,
+          },
+        ],
+      }),
+    );
+
+    expect(transaction.ipdeOrderItem.findMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: 'tenant-1',
+        orderId: 'order-1',
+        status: { not: IpdeOrderItemStatus.REMOVED },
+      },
+    });
+    expect(transaction.ipdeOrderItem.update).toHaveBeenCalledWith({
+      where: { id: 'item-1' },
+      data: expect.objectContaining({
+        issuerCode: 'CAC',
+        issuerVariantCode: 'CAC_DECANO',
+      }),
+    });
+    expect(result.appliedChanges).toContainEqual({
+      type: 'ISSUER_SELECTION_SET',
+      orderItemId: 'item-1',
+    });
+  });
+
+  it('overwrites an existing issuer only after an explicit correction', async () => {
+    const transaction = transactionMock();
+    const activeState = { ...state(), activeOrderId: 'order-1' };
+    const activeOrder = {
+      id: 'order-1',
+      tenantId: 'tenant-1',
+      conversationStateId: 'state-1',
+      fullName: null,
+      fullNameConfirmedAt: null,
+    };
+    transaction.ipdeConversationState.findFirst.mockResolvedValue(activeState);
+    transaction.ipdeOrder.findFirst.mockResolvedValue(activeOrder);
+    transaction.ipdeOrderItem.findMany.mockResolvedValue([
+      {
+        id: 'item-1',
+        tenantId: 'tenant-1',
+        orderId: 'order-1',
+        subjectRequestId: null,
+        normalizedTopicName: 'tema comercial',
+        issuerCode: 'UNT',
+        issuerVariantCode: 'UNT_POSGRADO',
+        status: IpdeOrderItemStatus.CONFIRMED,
+        confirmedAt: now,
+      },
+    ]);
+    const service = serviceWith(transaction);
+
+    await service.apply(
+      context(),
+      plan({
+        issuerMutations: [
+          {
+            issuerCode: 'CAC',
+            issuerVariantCode: 'CAC_DECANO',
+            appliesTo: 'ALL',
+            correctionExplicit: false,
+          },
+        ],
+      }),
+    );
+
+    expect(transaction.ipdeOrderItem.update).not.toHaveBeenCalled();
+
+    await service.apply(
+      context(),
+      plan({
+        issuerMutations: [
+          {
+            issuerCode: 'CAC',
+            issuerVariantCode: 'CAC_DECANO',
+            appliesTo: 'ALL',
+            correctionExplicit: true,
+          },
+        ],
+      }),
+    );
+
+    expect(transaction.ipdeOrderItem.update).toHaveBeenCalledWith({
+      where: { id: 'item-1' },
+      data: {
+        issuerCode: 'CAC',
+        issuerVariantCode: 'CAC_DECANO',
+        status: IpdeOrderItemStatus.DRAFT,
+        confirmedAt: null,
+      },
+    });
+  });
+
+  it('persists an unconfirmed quote and does not overwrite a confirmed quote', async () => {
+    const transaction = transactionMock();
+    const activeState = { ...state(), activeOrderId: 'order-1' };
+    const activeOrder = {
+      id: 'order-1',
+      tenantId: 'tenant-1',
+      conversationStateId: 'state-1',
+      status: IpdeOrderStatus.DRAFT,
+      paymentStatus: IpdePaymentStatus.NOT_REQUESTED,
+      fullName: null,
+      normalizedFullName: null,
+      fullNameConfirmedAt: null,
+      currencyCode: 'PEN',
+      quotedAmount: null,
+      quoteConfirmedAt: null,
+      confirmedAt: null,
+      readyForIssuanceAt: null,
+      completedAt: null,
+      cancelledAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    transaction.ipdeConversationState.findFirst.mockResolvedValue(activeState);
+    transaction.ipdeOrder.findFirst.mockResolvedValue(activeOrder);
+    transaction.ipdeOrder.update.mockResolvedValue({
+      ...activeOrder,
+      quotedAmount: '80.00',
+    });
+    const service = serviceWith(transaction);
+
+    const result = await service.apply(
+      context(),
+      plan({
+        quoteMutation: {
+          amount: '80.00',
+          currencyCode: 'PEN',
+          confirmed: false,
+          correctionExplicit: false,
+        },
+      }),
+    );
+
+    expect(transaction.ipdeOrder.update).toHaveBeenCalledWith({
+      where: { id: 'order-1' },
+      data: {
+        quotedAmount: expect.anything(),
+        currencyCode: 'PEN',
+        quoteConfirmedAt: null,
+      },
+    });
+    expect(result.appliedChanges).toContainEqual({
+      type: 'QUOTE_SET',
+      orderId: 'order-1',
+    });
+
+    transaction.ipdeOrder.update.mockClear();
+    transaction.ipdeOrder.findFirst.mockResolvedValue({
+      ...activeOrder,
+      quotedAmount: { equals: () => false },
+      quoteConfirmedAt: now,
+    });
+
+    await service.apply(
+      context(),
+      plan({
+        quoteMutation: {
+          amount: '70.00',
+          currencyCode: 'PEN',
+          confirmed: false,
+          correctionExplicit: false,
+        },
+      }),
+    );
+
+    expect(transaction.ipdeOrder.update).not.toHaveBeenCalled();
   });
 
   it('does not touch the state on an idempotent repeated no-op', async () => {

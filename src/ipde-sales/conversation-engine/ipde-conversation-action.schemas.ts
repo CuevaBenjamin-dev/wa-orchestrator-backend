@@ -3,6 +3,7 @@ import { ProductTypeSchema } from '../../catalog/domain/catalog.schemas';
 
 const DraftSchema = z.string().trim().min(1).max(20_000);
 const ShortTextSchema = z.string().trim().min(1).max(500);
+const MoneyAmountSchema = z.string().regex(/^(?:0|[1-9]\d*)\.\d{2}$/);
 
 const NoAutomatedResponseSchema = z
   .object({
@@ -109,10 +110,151 @@ const AskProductTypeSchema = z
   })
   .strict();
 
+const IssuerOptionSchema = z
+  .object({
+    issuerCode: z.string().trim().min(1).max(80),
+    issuerName: z.string().trim().min(1).max(200),
+    variantCode: z.string().trim().min(1).max(80),
+    variantName: z.string().trim().min(1).max(200),
+    description: z.string().trim().min(1).max(500),
+    recommended: z.boolean(),
+  })
+  .strict();
+
 const AskIssuerVariantSchema = z
   .object({
     type: z.literal('ASK_ISSUER_VARIANT'),
-    configurationPending: z.literal(true),
+    configurationPending: z.boolean(),
+    recommended: IssuerOptionSchema.omit({ recommended: true }).optional(),
+    options: z.array(IssuerOptionSchema).min(1).max(10).optional(),
+    messageDraft: DraftSchema,
+  })
+  .strict()
+  .superRefine((action, context) => {
+    if (
+      action.configurationPending === false &&
+      (!action.recommended || !action.options)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Configured issuer action requires recommendation and options',
+      });
+    }
+    if (
+      action.configurationPending === true &&
+      (action.recommended || action.options)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Pending issuer action cannot expose configured options',
+      });
+    }
+    if (
+      action.configurationPending === false &&
+      action.recommended &&
+      action.options
+    ) {
+      const optionKeys = action.options.map(
+        (option) => `${option.issuerCode}:${option.variantCode}`,
+      );
+      if (new Set(optionKeys).size !== optionKeys.length) {
+        context.addIssue({
+          code: 'custom',
+          path: ['options'],
+          message: 'Configured issuer options must be unique',
+        });
+      }
+      const recommendedOptions = action.options.filter(
+        (option) => option.recommended,
+      );
+      if (
+        recommendedOptions.length !== 1 ||
+        recommendedOptions[0].issuerCode !== action.recommended.issuerCode ||
+        recommendedOptions[0].variantCode !== action.recommended.variantCode
+      ) {
+        context.addIssue({
+          code: 'custom',
+          path: ['recommended'],
+          message: 'Recommendation must match exactly one configured option',
+        });
+      }
+    }
+  });
+
+const OfferModelPdfOptionsSchema = z
+  .object({
+    type: z.literal('OFFER_MODEL_PDF_OPTIONS'),
+    modelPdfAssets: z
+      .array(
+        z
+          .object({
+            id: z.string().trim().min(1).max(160),
+            title: z.string().trim().min(1).max(200),
+            description: z.string().trim().min(1).max(500),
+            issuerCode: z.string().trim().min(1).max(80),
+            issuerVariantCode: z.string().trim().min(1).max(80),
+            productTypeCode: ProductTypeSchema,
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(30),
+    messageDraft: DraftSchema,
+  })
+  .strict()
+  .superRefine((action, context) => {
+    const ids = action.modelPdfAssets.map((asset) => asset.id);
+    if (new Set(ids).size !== ids.length) {
+      context.addIssue({
+        code: 'custom',
+        path: ['modelPdfAssets'],
+        message: 'Model PDF options must be unique',
+      });
+    }
+  });
+
+const QuotePriceSchema = z
+  .object({
+    type: z.literal('QUOTE_PRICE'),
+    currencyCode: z.literal('PEN'),
+    totalRegularAmount: MoneyAmountSchema,
+    totalPromotionalAmount: MoneyAmountSchema,
+    promotionLabel: z.string().trim().min(1).max(500).nullable(),
+    appliedRuleIds: z.array(z.string().trim().min(1).max(160)).min(1).max(75),
+    messageDraft: DraftSchema,
+  })
+  .strict()
+  .superRefine((action, context) => {
+    if (new Set(action.appliedRuleIds).size !== action.appliedRuleIds.length) {
+      context.addIssue({
+        code: 'custom',
+        path: ['appliedRuleIds'],
+        message: 'Applied pricing rule IDs must be unique',
+      });
+    }
+  });
+
+const QuoteDiscountSchema = z
+  .object({
+    type: z.literal('QUOTE_DISCOUNT'),
+    currencyCode: z.literal('PEN'),
+    currentAmount: MoneyAmountSchema,
+    discountedAmount: MoneyAmountSchema,
+    discountAvailable: z.boolean(),
+    messageDraft: DraftSchema,
+  })
+  .strict();
+
+const PriceNotAvailableSchema = z
+  .object({
+    type: z.literal('PRICE_NOT_AVAILABLE'),
+    reason: z.enum([
+      'MISSING_TOPICS',
+      'MISSING_PRODUCT',
+      'MISSING_ISSUER',
+      'NO_PRICING_RULE',
+      'PARTIAL_PRICING',
+    ]),
     messageDraft: DraftSchema,
   })
   .strict();
@@ -158,7 +300,11 @@ const DeferredCommercialRequestSchema = z
   .object({
     type: z.literal('DEFERRED_COMMERCIAL_REQUEST'),
     intents: z.array(IpdeDeferredIntentSchema).min(1),
-    reason: z.literal('OUT_OF_SCOPE_FOR_BLOCK_5'),
+    reason: z.enum([
+      'OUT_OF_SCOPE_FOR_BLOCK_5',
+      'MEDIA_NOT_CONFIGURED',
+      'PAYMENT_METHODS_NOT_CONFIGURED',
+    ]),
   })
   .strict();
 
@@ -172,6 +318,10 @@ export const IpdeOutboundActionSchema = z.discriminatedUnion('type', [
   ConfirmSelectedTopicsSchema,
   AskProductTypeSchema,
   AskIssuerVariantSchema,
+  OfferModelPdfOptionsSchema,
+  QuotePriceSchema,
+  QuoteDiscountSchema,
+  PriceNotAvailableSchema,
   AskFullNameSchema,
   ConfirmFullNameSchema,
   AskOrderConfirmationSchema,

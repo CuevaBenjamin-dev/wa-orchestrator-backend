@@ -1,0 +1,68 @@
+[
+  {
+    "id": "derecho-diplomado",
+    "categoryCode": "DERECHO",
+    "productTypeCode": "DIPLOMADO",
+    "expectedVariant": "CAC_DECANO"
+  },
+  {
+    "id": "educacion-especializacion",
+    "categoryCode": "EDUCACION",
+    "productTypeCode": "ESPECIALIZACION",
+    "expectedVariant": "UNT_POSGRADO"
+  },
+  {
+    "id": "gestion-publica-curso",
+    "categoryCode": "GESTION_PUBLICA",
+    "productTypeCode": "CURSO",
+    "expectedVariant": "UNT_POSGRADO"
+  },
+  {
+    "id": "salud-default",
+    "categoryCode": "SALUD",
+    "productTypeCode": "DIPLOMADO",
+    "expectedVariant": "UNT_POSGRADO"
+  },
+  {
+    "id": "otros-default",
+    "categoryCode": "OTROS",
+    "productTypeCode": "CURSO",
+    "expectedVariant": "UNT_POSGRADO"
+  },
+  {
+    "id": "unknown-default",
+    "categoryCode": null,
+    "productTypeCode": "CURSO",
+    "expectedVariant": "UNT_POSGRADO"
+  },
+  {
+    "id": "issuer-posgrado",
+    "message": "Quiero el de posgrado con firma y sello",
+    "expectedVariant": "UNT_POSGRADO"
+  },
+  {
+    "id": "issuer-directoral",
+    "message": "Prefiero resolución directoral",
+    "expectedVariant": "UNT_DIRECTORAL"
+  },
+  {
+    "id": "issuer-cac",
+    "message": "Quiero el del Colegio de Abogados",
+    "expectedVariant": "CAC_DECANO"
+  },
+  {
+    "id": "model-pdf",
+    "message": "Quiero ver el modelo PDF",
+    "expectedAction": "OFFER_MODEL_PDF_OPTIONS"
+  },
+  {
+    "id": "inactive-variant",
+    "mutation": "DISABLE_VARIANT",
+    "expectedError": "INVALID_COMMERCIAL_CONFIG"
+  },
+  {
+    "id": "inactive-model",
+    "mutation": "DISABLE_MODEL",
+    "expectedVisible": false
+  }
+]

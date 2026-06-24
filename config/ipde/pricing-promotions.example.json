@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "tenantCode": "IPDE",
+  "currencyCode": "PEN",
+  "rules": [
+    {
+      "id": "PRICE_DERECHO_DIPLOMADO_CAC_DECANO_1",
+      "active": true,
+      "priority": 30,
+      "categoryCode": "DERECHO",
+      "productTypeCode": "DIPLOMADO",
+      "issuerCode": "CAC",
+      "issuerVariantCode": "CAC_DECANO",
+      "minQuantity": 1,
+      "maxQuantity": 1,
+      "regularAmount": "120.00",
+      "promotionalAmount": "80.00",
+      "minimumAuthorizedAmount": "70.00",
+      "promotionLabel": "Promoción vigente",
+      "customerFacingLabel": "Precio promocional",
+      "notes": "Ejemplo ficticio; reemplazar por precios aprobados."
+    },
+    {
+      "id": "PRICE_ANY_CURSO_UNT_POSGRADO_1",
+      "active": true,
+      "priority": 10,
+      "categoryCode": "ANY",
+      "productTypeCode": "CURSO",
+      "issuerCode": "UNT",
+      "issuerVariantCode": "UNT_POSGRADO",
+      "minQuantity": 1,
+      "maxQuantity": null,
+      "regularAmount": "120.00",
+      "promotionalAmount": "80.00",
+      "minimumAuthorizedAmount": "70.00",
+      "promotionLabel": "Promoción vigente",
+      "customerFacingLabel": "Precio promocional",
+      "notes": "Ejemplo ficticio; reemplazar por precios aprobados."
+    }
+  ]
+}

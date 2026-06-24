@@ -303,20 +303,32 @@ export class IpdeUnderstandingFallbackService {
   private extractIssuerPreference(
     text: string,
   ): IpdeMessageExtraction['issuerPreference'] {
-    if (/\bunt\b/.test(text)) {
-      return {
-        issuerCode: 'UNT',
-        variantCode: /\bposgrado\b/.test(text)
-          ? 'UNT_POSGRADO'
-          : 'UNT_DIRECTORAL',
-        confidence: 0.8,
-      };
-    }
-    if (/\bcac\b/.test(text)) {
+    if (/\b(cac|colegio de abogados(?: del callao)?)\b/.test(text)) {
       return {
         issuerCode: 'CAC',
         variantCode: 'CAC_DECANO',
-        confidence: 0.8,
+        confidence: 0.9,
+      };
+    }
+    if (/\b(posgrado|unidad de posgrado)\b/.test(text)) {
+      return {
+        issuerCode: 'UNT',
+        variantCode: 'UNT_POSGRADO',
+        confidence: 0.9,
+      };
+    }
+    if (/\b(resolucion directoral|directoral)\b/.test(text)) {
+      return {
+        issuerCode: 'UNT',
+        variantCode: 'UNT_DIRECTORAL',
+        confidence: 0.9,
+      };
+    }
+    if (/\bunt\b/.test(text)) {
+      return {
+        issuerCode: 'UNT',
+        variantCode: 'UNSPECIFIED',
+        confidence: 0.65,
       };
     }
     return {

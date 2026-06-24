@@ -4,6 +4,13 @@ import { SubjectCatalogEntry } from '../../catalog/domain/catalog.types';
 import { IpdeStageTransitionPolicy } from '../domain/ipde-stage-transition.policy';
 import { IpdeMessageExtractionSchema } from '../understanding/ipde-understanding.schemas';
 import { IpdeCatalogResolutionResultSchema } from '../catalog-resolution/ipde-catalog-resolution.schemas';
+import { IpdeCommercialConfigService } from '../commercial-config/ipde-commercial-config.service';
+import { IpdeIssuerSelectionService } from '../commercial-config/ipde-issuer-selection.service';
+import { IpdeModelPdfSelectionService } from '../commercial-config/ipde-model-pdf-selection.service';
+import { IpdeDiscountPolicyService } from '../pricing/ipde-discount-policy.service';
+import { IpdeOrderPricingProjectionService } from '../pricing/ipde-order-pricing-projection.service';
+import { IpdePricingConfigService } from '../pricing/ipde-pricing-config.service';
+import { IpdePricingService } from '../pricing/ipde-pricing.service';
 import { IpdeConversationPlannerService } from './ipde-conversation-planner.service';
 import { IpdeNextRequiredFieldPolicy } from './ipde-next-required-field.policy';
 import { IpdeResponseCopyService } from './ipde-response-copy.service';
@@ -101,11 +108,24 @@ function catalogEntry(): SubjectCatalogEntry {
 
 describe('IpdeConversationPlannerService', () => {
   const transitions = new IpdeStageTransitionPolicy();
-  const planner = new IpdeConversationPlannerService(
-    new IpdeNextRequiredFieldPolicy(),
-    new IpdeResponseCopyService(new ConfigService()),
-    transitions,
-  );
+  const commercial = new IpdeCommercialConfigService(new ConfigService());
+  const pricingConfig = new IpdePricingConfigService(new ConfigService());
+  let planner: IpdeConversationPlannerService;
+
+  beforeAll(async () => {
+    await commercial.onModuleInit();
+    await pricingConfig.onModuleInit();
+    planner = new IpdeConversationPlannerService(
+      new IpdeNextRequiredFieldPolicy(),
+      new IpdeResponseCopyService(new ConfigService()),
+      transitions,
+      commercial,
+      new IpdeIssuerSelectionService(commercial),
+      new IpdeModelPdfSelectionService(commercial),
+      new IpdePricingService(pricingConfig, new IpdeDiscountPolicyService()),
+      new IpdeOrderPricingProjectionService(),
+    );
+  });
 
   it('keeps an isolated greeting free of order creation', () => {
     const plan = planner.plan({
@@ -238,9 +258,8 @@ describe('IpdeConversationPlannerService', () => {
     expect(plan.outboundActions.map((action) => action.type)).toEqual([
       'CONFIRM_SELECTED_TOPICS',
       'ASK_PRODUCT_TYPE',
-      'DEFERRED_COMMERCIAL_REQUEST',
     ]);
-    expect(plan.deferredIntents).toEqual(['PRICE']);
+    expect(plan.deferredIntents).toEqual([]);
   });
 
   it('does not present a partial list when one resolution needs clarification', () => {

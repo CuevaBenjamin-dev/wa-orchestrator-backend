@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "tenantCode": "IPDE",
+  "assets": [
+    {
+      "id": "MODEL_CAC_DECANO_DIPLOMADO",
+      "tenantCode": "IPDE",
+      "issuerCode": "CAC",
+      "issuerVariantCode": "CAC_DECANO",
+      "productTypeCode": "DIPLOMADO",
+      "title": "Modelo referencial CAC - Diplomado",
+      "description": "Modelo referencial de presentación para diplomado con la variante CAC Decano.",
+      "fileName": "cac-decano-diplomado-placeholder.pdf",
+      "active": true,
+      "priority": 10
+    },
+    {
+      "id": "MODEL_CAC_DECANO_ESPECIALIZACION",
+      "tenantCode": "IPDE",
+      "issuerCode": "CAC",
+      "issuerVariantCode": "CAC_DECANO",
+      "productTypeCode": "ESPECIALIZACION",
+      "title": "Modelo referencial CAC - Especialización",
+      "description": "Modelo referencial de presentación para especialización con la variante CAC Decano.",
+      "fileName": "cac-decano-especializacion-placeholder.pdf",
+      "active": true,
+      "priority": 20
+    },
+    {
+      "id": "MODEL_CAC_DECANO_CURSO",
+      "tenantCode": "IPDE",
+      "issuerCode": "CAC",
+      "issuerVariantCode": "CAC_DECANO",
+      "productTypeCode": "CURSO",
+      "title": "Modelo referencial CAC - Curso",
+      "description": "Modelo referencial base para cursos y sus modalidades derivadas con la variante CAC Decano.",
+      "fileName": "cac-decano-curso-placeholder.pdf",
+      "active": true,
+      "priority": 30
+    },
+    {
+      "id": "MODEL_UNT_DIRECTORAL_DIPLOMADO",
+      "tenantCode": "IPDE",
+      "issuerCode": "UNT",
+      "issuerVariantCode": "UNT_DIRECTORAL",
+      "productTypeCode": "DIPLOMADO",
+      "title": "Modelo referencial UNT Directoral - Diplomado",
+      "description": "Modelo referencial de presentación para diplomado con resolución directoral.",
+      "fileName": "unt-directoral-diplomado-placeholder.pdf",
+      "active": true,
+      "priority": 40
+    },
+    {
+      "id": "MODEL_UNT_DIRECTORAL_ESPECIALIZACION",
+      "tenantCode": "IPDE",
+      "issuerCode": "UNT",
+      "issuerVariantCode": "UNT_DIRECTORAL",
+      "productTypeCode": "ESPECIALIZACION",
+      "title": "Modelo referencial UNT Directoral - Especialización",
+      "description": "Modelo referencial de presentación para especialización con resolución directoral.",
+      "fileName": "unt-directoral-especializacion-placeholder.pdf",
+      "active": true,
+      "priority": 50
+    },
+    {
+      "id": "MODEL_UNT_DIRECTORAL_CURSO",
+      "tenantCode": "IPDE",
+      "issuerCode": "UNT",
+      "issuerVariantCode": "UNT_DIRECTORAL",
+      "productTypeCode": "CURSO",
+      "title": "Modelo referencial UNT Directoral - Curso",
+      "description": "Modelo referencial base para cursos y sus modalidades derivadas con resolución directoral.",
+      "fileName": "unt-directoral-curso-placeholder.pdf",
+      "active": true,
+      "priority": 60
+    },
+    {
+      "id": "MODEL_UNT_POSGRADO_DIPLOMADO",
+      "tenantCode": "IPDE",
+      "issuerCode": "UNT",
+      "issuerVariantCode": "UNT_POSGRADO",
+      "productTypeCode": "DIPLOMADO",
+      "title": "Modelo referencial UNT Posgrado - Diplomado",
+      "description": "Modelo referencial de presentación para diplomado con la variante de posgrado.",
+      "fileName": "unt-posgrado-diplomado-placeholder.pdf",
+      "active": true,
+      "priority": 70
+    },
+    {
+      "id": "MODEL_UNT_POSGRADO_ESPECIALIZACION",
+      "tenantCode": "IPDE",
+      "issuerCode": "UNT",
+      "issuerVariantCode": "UNT_POSGRADO",
+      "productTypeCode": "ESPECIALIZACION",
+      "title": "Modelo referencial UNT Posgrado - Especialización",
+      "description": "Modelo referencial de presentación para especialización con la variante de posgrado.",
+      "fileName": "unt-posgrado-especializacion-placeholder.pdf",
+      "active": true,
+      "priority": 80
+    },
+    {
+      "id": "MODEL_UNT_POSGRADO_CURSO",
+      "tenantCode": "IPDE",
+      "issuerCode": "UNT",
+      "issuerVariantCode": "UNT_POSGRADO",
+      "productTypeCode": "CURSO",
+      "title": "Modelo referencial UNT Posgrado - Curso",
+      "description": "Modelo referencial base para cursos y sus modalidades derivadas con la variante de posgrado.",
+      "fileName": "unt-posgrado-curso-placeholder.pdf",
+      "active": true,
+      "priority": 90
+    }
+  ]
+}
