@@ -22,6 +22,8 @@ import { IpdeResponseCopyService } from './conversation-engine/ipde-response-cop
 import { IpdeTurnPersistenceService } from './conversation-engine/ipde-turn-persistence.service';
 import { IpdeCommercialConfigModule } from './commercial-config/ipde-commercial-config.module';
 import { IpdePricingModule } from './pricing/ipde-pricing.module';
+import { IpdeMediaModule } from './media/ipde-media.module';
+import { IpdeOutboundModule } from './outbound/ipde-outbound.module';
 
 @Module({
   imports: [
@@ -29,6 +31,8 @@ import { IpdePricingModule } from './pricing/ipde-pricing.module';
     CatalogModule,
     IpdeCommercialConfigModule,
     IpdePricingModule,
+    IpdeMediaModule,
+    IpdeOutboundModule,
   ],
   providers: [
     IpdeCatalogResolutionService,
@@ -57,6 +61,7 @@ import { IpdePricingModule } from './pricing/ipde-pricing.module';
     IpdeMessageUnderstandingService,
     IpdeCatalogResolutionService,
     IpdeConversationTurnService,
+    IpdeOutboundModule,
   ],
 })
 export class IpdeSalesModule {}

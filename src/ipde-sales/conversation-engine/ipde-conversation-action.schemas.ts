@@ -259,6 +259,23 @@ const PriceNotAvailableSchema = z
   })
   .strict();
 
+const SendPromotionImageSchema = z
+  .object({
+    type: z.literal('SEND_PROMOTION_IMAGE'),
+    assetId: z.string().trim().min(1).max(160),
+    categoryCode: z.string().trim().min(1).max(80).nullable(),
+    messageDraft: DraftSchema,
+  })
+  .strict();
+
+const SendPaymentMethodsImageSchema = z
+  .object({
+    type: z.literal('SEND_PAYMENT_METHODS_IMAGE'),
+    assetId: z.string().trim().min(1).max(160),
+    messageDraft: DraftSchema,
+  })
+  .strict();
+
 const AskFullNameSchema = z
   .object({ type: z.literal('ASK_FULL_NAME'), messageDraft: DraftSchema })
   .strict();
@@ -322,6 +339,8 @@ export const IpdeOutboundActionSchema = z.discriminatedUnion('type', [
   QuotePriceSchema,
   QuoteDiscountSchema,
   PriceNotAvailableSchema,
+  SendPromotionImageSchema,
+  SendPaymentMethodsImageSchema,
   AskFullNameSchema,
   ConfirmFullNameSchema,
   AskOrderConfirmationSchema,

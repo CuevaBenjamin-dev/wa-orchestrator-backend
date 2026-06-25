@@ -7,6 +7,9 @@ import { IpdeCatalogResolutionResultSchema } from '../catalog-resolution/ipde-ca
 import { IpdeCommercialConfigService } from '../commercial-config/ipde-commercial-config.service';
 import { IpdeIssuerSelectionService } from '../commercial-config/ipde-issuer-selection.service';
 import { IpdeModelPdfSelectionService } from '../commercial-config/ipde-model-pdf-selection.service';
+import { IpdeMediaAssetsService } from '../media/ipde-media-assets.service';
+import { IpdeMediaSelectionService } from '../media/ipde-media-selection.service';
+import { IpdeMediaStorageService } from '../media/ipde-media-storage.service';
 import { IpdeDiscountPolicyService } from '../pricing/ipde-discount-policy.service';
 import { IpdeOrderPricingProjectionService } from '../pricing/ipde-order-pricing-projection.service';
 import { IpdePricingConfigService } from '../pricing/ipde-pricing-config.service';
@@ -110,11 +113,18 @@ describe('IpdeConversationPlannerService', () => {
   const transitions = new IpdeStageTransitionPolicy();
   const commercial = new IpdeCommercialConfigService(new ConfigService());
   const pricingConfig = new IpdePricingConfigService(new ConfigService());
+  const mediaConfig = new ConfigService();
   let planner: IpdeConversationPlannerService;
 
   beforeAll(async () => {
     await commercial.onModuleInit();
     await pricingConfig.onModuleInit();
+    const mediaAssets = new IpdeMediaAssetsService(
+      mediaConfig,
+      new IpdeMediaSelectionService(),
+      new IpdeMediaStorageService(mediaConfig),
+    );
+    await mediaAssets.onModuleInit();
     planner = new IpdeConversationPlannerService(
       new IpdeNextRequiredFieldPolicy(),
       new IpdeResponseCopyService(new ConfigService()),
@@ -122,6 +132,7 @@ describe('IpdeConversationPlannerService', () => {
       commercial,
       new IpdeIssuerSelectionService(commercial),
       new IpdeModelPdfSelectionService(commercial),
+      mediaAssets,
       new IpdePricingService(pricingConfig, new IpdeDiscountPolicyService()),
       new IpdeOrderPricingProjectionService(),
     );

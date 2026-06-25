@@ -19,7 +19,7 @@ El motor sí puede:
 - pausar la automatización cuando el usuario pide una persona;
 - producir acciones salientes estrictas y borradores deterministas.
 
-El motor calcula precios únicamente mediante la configuración manual de pricing del Bloque 7. No valida pagos, procesa comprobantes, envía medios de pago, genera o envía archivos, usa búsqueda web ni modifica `UsageDaily`. La validación comercial de emisores pertenece al módulo de configuración de IPDE. Tampoco introduce controllers, endpoints, jobs, cron, cambios de Prisma o integración con `WhatsappService`.
+El motor calcula precios únicamente mediante la configuración manual de pricing del Bloque 7. Desde el Bloque 8 también puede producir acciones visuales para promoción y medios de pago cuando existe un asset multimedia activo, pero sigue sin ejecutar el envío por sí mismo. No valida pagos, procesa comprobantes, genera PDFs finales, usa búsqueda web ni modifica `UsageDaily`. La validación comercial de emisores pertenece al módulo de configuración de IPDE. Tampoco introduce controllers, endpoints, jobs, cron, cambios de Prisma o integración con `WhatsappService.handleIncomingWebhook`.
 
 ## Flujo
 
@@ -142,7 +142,11 @@ Todas las acciones pasan por `IpdeOutboundActionSchema`. Entre ellas están:
 
 `IpdeResponseCopyService` genera texto breve, cálido y determinista. Cada lista se numera del 1 al 25 y se divide sin partir temas. `IPDE_WHATSAPP_TEXT_CHUNK_MAX_CHARS` acepta entre 500 y 4000, con 3000 por defecto. La introducción vive en el primer fragmento y la instrucción de selección en el último.
 
-Las intenciones `PRICE`, `DISCOUNT` y parte de `PROMOTION` se resuelven cuando el pedido proyectado tiene tema, producto, emisor y variante, y existe una regla de pricing activa. El motor produce `QUOTE_PRICE`, `QUOTE_DISCOUNT` o `PRICE_NOT_AVAILABLE`, y persiste `quotedAmount` sin confirmar la cotización. No expone `minimumAuthorizedAmount`. `PAYMENT_METHODS` se conserva como `DEFERRED_COMMERCIAL_REQUEST` con razón `PAYMENT_METHODS_NOT_CONFIGURED`, y `PAYMENT_PROOF_MENTION` sigue diferido. `MODEL_PDF` produce `OFFER_MODEL_PDF_OPTIONS` cuando el pedido tiene producto y emisor completos y existe un modelo activo; la acción omite toda ubicación interna y no envía el archivo. Si la combinación completa no está configurada, se difiere con `MEDIA_NOT_CONFIGURED`.
+Las intenciones `PRICE`, `DISCOUNT` y parte de `PROMOTION` se resuelven cuando el pedido proyectado tiene tema, producto, emisor y variante, y existe una regla de pricing activa. El motor produce `QUOTE_PRICE`, `QUOTE_DISCOUNT` o `PRICE_NOT_AVAILABLE`, y persiste `quotedAmount` sin confirmar la cotización. No expone `minimumAuthorizedAmount`.
+
+Cuando el cliente solicita promoción y existe una imagen activa en `media-assets.json`, el planner añade `SEND_PROMOTION_IMAGE`. Cuando solicita medios de pago y existe `PAYMENT_METHODS_IMAGE`, añade `SEND_PAYMENT_METHODS_IMAGE`. En ambos casos solo produce la acción; la ejecución queda en `IpdeOutboundActionExecutorService`. Si falta media, conserva un `DEFERRED_COMMERCIAL_REQUEST` con razón segura.
+
+`PAYMENT_PROOF_MENTION` sigue diferido. `MODEL_PDF` produce `OFFER_MODEL_PDF_OPTIONS` cuando el pedido tiene producto y emisor completos y existe un modelo activo; la acción omite toda ubicación interna. El executor del Bloque 8 resuelve el ID contra el manifiesto autorizado y solo envía documentos si existe media real configurada. Si la combinación completa no está configurada, se difiere con `MEDIA_NOT_CONFIGURED`.
 
 ## Resultado, métricas y logs
 

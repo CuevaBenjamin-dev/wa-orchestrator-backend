@@ -230,6 +230,19 @@ export class IpdeCommercialConfigService implements OnModuleInit {
     return [];
   }
 
+  getModelPdfAssetById(params: {
+    tenantCode: 'IPDE';
+    assetId: string;
+  }): IpdeModelPdfAsset | null {
+    this.requireTenant(params.tenantCode);
+    const manifest = this.requireManifest();
+    return (
+      manifest.assets.find(
+        (asset) => asset.active && asset.id === params.assetId,
+      ) ?? null
+    );
+  }
+
   private requireConfig(): IpdeCommercialConfig {
     if (!this.commercialConfig) {
       throw new IpdeCommercialConfigError(

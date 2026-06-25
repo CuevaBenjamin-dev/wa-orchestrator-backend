@@ -10,6 +10,9 @@ import {
 import { IpdeCommercialConfigService } from '../commercial-config/ipde-commercial-config.service';
 import { IpdeIssuerSelectionService } from '../commercial-config/ipde-issuer-selection.service';
 import { IpdeModelPdfSelectionService } from '../commercial-config/ipde-model-pdf-selection.service';
+import { IpdeMediaAssetsService } from '../media/ipde-media-assets.service';
+import { IpdeMediaSelectionService } from '../media/ipde-media-selection.service';
+import { IpdeMediaStorageService } from '../media/ipde-media-storage.service';
 import { IpdeDiscountPolicyService } from '../pricing/ipde-discount-policy.service';
 import { IpdeOrderPricingProjectionService } from '../pricing/ipde-order-pricing-projection.service';
 import { IpdePricingConfigService } from '../pricing/ipde-pricing-config.service';
@@ -148,12 +151,20 @@ function contextWithItem(params: {
 describe('IpdeConversationPlannerService commercial configuration', () => {
   const commercial = new IpdeCommercialConfigService(new ConfigService());
   const pricingConfig = new IpdePricingConfigService(new ConfigService());
+  const mediaConfig = new ConfigService();
   let planner: IpdeConversationPlannerService;
   let modelPdfs: IpdeModelPdfSelectionService;
+  let mediaAssets: IpdeMediaAssetsService;
 
   beforeAll(async () => {
     await commercial.onModuleInit();
     await pricingConfig.onModuleInit();
+    mediaAssets = new IpdeMediaAssetsService(
+      mediaConfig,
+      new IpdeMediaSelectionService(),
+      new IpdeMediaStorageService(mediaConfig),
+    );
+    await mediaAssets.onModuleInit();
     modelPdfs = new IpdeModelPdfSelectionService(commercial);
     planner = new IpdeConversationPlannerService(
       new IpdeNextRequiredFieldPolicy(),
@@ -162,6 +173,7 @@ describe('IpdeConversationPlannerService commercial configuration', () => {
       commercial,
       new IpdeIssuerSelectionService(commercial),
       modelPdfs,
+      mediaAssets,
       new IpdePricingService(pricingConfig, new IpdeDiscountPolicyService()),
       new IpdeOrderPricingProjectionService(),
     );
@@ -442,7 +454,7 @@ describe('IpdeConversationPlannerService commercial configuration', () => {
     expect(plan.quoteMutation).toBeNull();
   });
 
-  it('keeps payment methods deferred with the specific payment reason', () => {
+  it('produces payment methods image action when a configured asset exists', () => {
     const plan = planner.plan({
       context: contextWithItem({
         categoryCode: 'DERECHO',
@@ -458,10 +470,35 @@ describe('IpdeConversationPlannerService commercial configuration', () => {
     });
 
     expect(plan.outboundActions).toContainEqual({
-      type: 'DEFERRED_COMMERCIAL_REQUEST',
-      intents: ['PAYMENT_METHODS'],
-      reason: 'PAYMENT_METHODS_NOT_CONFIGURED',
+      type: 'SEND_PAYMENT_METHODS_IMAGE',
+      assetId: 'PAYMENT_METHODS_GENERAL',
+      messageDraft: 'Claro, te envío los medios de pago disponibles.',
     });
-    expect(plan.deferredIntents).toContain('PAYMENT_METHODS');
+    expect(plan.deferredIntents).not.toContain('PAYMENT_METHODS');
+  });
+
+  it('produces promotion image action when promotion is requested', () => {
+    const plan = planner.plan({
+      context: contextWithItem({
+        categoryCode: 'DERECHO',
+        productTypeCode: 'DIPLOMADO',
+        issuerCode: 'CAC',
+        issuerVariantCode: 'CAC_DECANO',
+      }),
+      extraction: extraction({
+        primaryIntent: 'REQUEST_PROMOTION',
+        requestedArtifacts: ['PROMOTION_IMAGE'],
+      }),
+      catalogResolution: null,
+    });
+
+    expect(plan.outboundActions).toContainEqual(
+      expect.objectContaining({
+        type: 'SEND_PROMOTION_IMAGE',
+        assetId: 'PROMO_DERECHO_GENERAL',
+        categoryCode: 'DERECHO',
+      }),
+    );
+    expect(plan.deferredIntents).not.toContain('PROMOTION');
   });
 });

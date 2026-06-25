@@ -54,7 +54,7 @@ El manifiesto registra metadatos; no exige que un PDF exista físicamente durant
 
 El motor genera `OFFER_MODEL_PDF_OPTIONS` solo cuando tema, producto y emisor están completos. La acción expone ID, título, descripción y códigos comerciales; omite `fileName`, `storageKey`, `publicUrl` y `whatsappMediaId`. Si la combinación está completa pero no tiene modelo activo, devuelve `DEFERRED_COMMERCIAL_REQUEST` con `MEDIA_NOT_CONFIGURED`.
 
-Este bloque no abre, genera ni envía PDFs. Tampoco llama Meta ni `WhatsappService`. Un bloque posterior podrá consumir el identificador lógico de la acción, resolver el medio en una capa autorizada y respetar `WHATSAPP_SEND_ENABLED`.
+El Bloque 6 no abre, genera ni envía PDFs. Desde el Bloque 8, `IpdeOutboundActionExecutorService` puede consumir el identificador lógico de `OFFER_MODEL_PDF_OPTIONS`, resolverlo contra este manifiesto autorizado y enviar el documento solo si el asset activo tiene `whatsappMediaId`, `publicUrl` o `storageKey`. Los placeholders que solo tienen `fileName` no se envían.
 
 ## Validación y operación
 

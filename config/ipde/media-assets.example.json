@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "tenantCode": "IPDE",
+  "assets": [
+    {
+      "id": "PROMO_DERECHO_GENERAL",
+      "active": true,
+      "priority": 100,
+      "type": "PROMOTION_IMAGE",
+      "categoryCode": "DERECHO",
+      "title": "Promoción general Derecho",
+      "description": "Ejemplo ficticio. Reemplazar por media aprobada.",
+      "fileName": "promo-derecho-general.png",
+      "storageKey": "promotions/promo-derecho-general.png",
+      "mimeType": "image/png",
+      "caption": "Promoción vigente para programas de Derecho."
+    },
+    {
+      "id": "PAYMENT_METHODS_GENERAL",
+      "active": true,
+      "priority": 100,
+      "type": "PAYMENT_METHODS_IMAGE",
+      "categoryCode": null,
+      "title": "Medios de pago IPDE",
+      "description": "Ejemplo ficticio. Reemplazar por media aprobada.",
+      "fileName": "payment-methods-general.png",
+      "storageKey": "payments/payment-methods-general.png",
+      "mimeType": "image/png",
+      "caption": "Medios de pago disponibles."
+    }
+  ]
+}

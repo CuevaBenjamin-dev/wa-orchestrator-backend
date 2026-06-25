@@ -77,4 +77,23 @@ describe('IPDE conversation turn schemas', () => {
       }),
     ).toThrow();
   });
+
+  it('accepts strict media outbound actions', () => {
+    expect(
+      IpdeOutboundActionSchema.parse({
+        type: 'SEND_PROMOTION_IMAGE',
+        assetId: 'PROMO_DERECHO_GENERAL',
+        categoryCode: 'DERECHO',
+        messageDraft: 'Claro, te comparto la promoción disponible.',
+      }),
+    ).toMatchObject({ type: 'SEND_PROMOTION_IMAGE' });
+
+    expect(
+      IpdeOutboundActionSchema.parse({
+        type: 'SEND_PAYMENT_METHODS_IMAGE',
+        assetId: 'PAYMENT_METHODS_GENERAL',
+        messageDraft: 'Claro, te envío los medios de pago disponibles.',
+      }),
+    ).toMatchObject({ type: 'SEND_PAYMENT_METHODS_IMAGE' });
+  });
 });

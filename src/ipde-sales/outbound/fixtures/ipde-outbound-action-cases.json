@@ -1,0 +1,14 @@
+{
+  "cases": [
+    "text-action",
+    "topic-list-chunks",
+    "payment-methods-image",
+    "promotion-image",
+    "model-pdf-with-media-id",
+    "model-pdf-with-link",
+    "model-pdf-placeholder",
+    "text-failure",
+    "image-failure"
+  ],
+  "notes": "Fixtures are labels only; unit tests build safe in-memory actions without real customer numbers."
+}

@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "tenantCode": "IPDE",
+  "assets": [
+    {
+      "id": "PROMO_DERECHO_GENERAL",
+      "active": true,
+      "priority": 100,
+      "type": "PROMOTION_IMAGE",
+      "categoryCode": "DERECHO",
+      "title": "Promoción general Derecho",
+      "description": "Placeholder lógico para imagen promocional de Derecho. Reemplazar por media aprobada antes de producción.",
+      "fileName": "promo-derecho-general.png",
+      "storageKey": "promotions/promo-derecho-general.png",
+      "mimeType": "image/png",
+      "caption": "Promoción vigente para programas de Derecho."
+    },
+    {
+      "id": "PROMO_EDUCACION_GENERAL",
+      "active": true,
+      "priority": 100,
+      "type": "PROMOTION_IMAGE",
+      "categoryCode": "EDUCACION",
+      "title": "Promoción general Educación",
+      "description": "Placeholder lógico para imagen promocional de Educación. Reemplazar por media aprobada antes de producción.",
+      "fileName": "promo-educacion-general.png",
+      "storageKey": "promotions/promo-educacion-general.png",
+      "mimeType": "image/png",
+      "caption": "Promoción vigente para programas de Educación."
+    },
+    {
+      "id": "PROMO_GESTION_PUBLICA_GENERAL",
+      "active": true,
+      "priority": 100,
+      "type": "PROMOTION_IMAGE",
+      "categoryCode": "GESTION_PUBLICA",
+      "title": "Promoción general Gestión Pública",
+      "description": "Placeholder lógico para imagen promocional de Gestión Pública. Reemplazar por media aprobada antes de producción.",
+      "fileName": "promo-gestion-publica-general.png",
+      "storageKey": "promotions/promo-gestion-publica-general.png",
+      "mimeType": "image/png",
+      "caption": "Promoción vigente para programas de Gestión Pública."
+    },
+    {
+      "id": "PROMO_OTROS_GENERAL",
+      "active": true,
+      "priority": 10,
+      "type": "PROMOTION_IMAGE",
+      "categoryCode": "OTROS",
+      "title": "Promoción general otras áreas",
+      "description": "Placeholder lógico para promoción general de otras categorías. Reemplazar por media aprobada antes de producción.",
+      "fileName": "promo-otros-general.png",
+      "storageKey": "promotions/promo-otros-general.png",
+      "mimeType": "image/png",
+      "caption": "Promoción vigente para programas IPDE."
+    },
+    {
+      "id": "PAYMENT_METHODS_GENERAL",
+      "active": true,
+      "priority": 100,
+      "type": "PAYMENT_METHODS_IMAGE",
+      "categoryCode": null,
+      "title": "Medios de pago IPDE",
+      "description": "Placeholder lógico para imagen de medios de pago. Reemplazar por media aprobada antes de producción.",
+      "fileName": "payment-methods-general.png",
+      "storageKey": "payments/payment-methods-general.png",
+      "mimeType": "image/png",
+      "caption": "Medios de pago disponibles."
+    }
+  ]
+}

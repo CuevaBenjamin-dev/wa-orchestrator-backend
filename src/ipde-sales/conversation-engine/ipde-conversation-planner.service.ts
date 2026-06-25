@@ -18,6 +18,7 @@ import {
 } from '../commercial-config/ipde-commercial-config.errors';
 import { IpdeIssuerSelectionService } from '../commercial-config/ipde-issuer-selection.service';
 import { IpdeModelPdfSelectionService } from '../commercial-config/ipde-model-pdf-selection.service';
+import { IpdeMediaAssetsService } from '../media/ipde-media-assets.service';
 import { IpdeOrderPricingProjectionService } from '../pricing/ipde-order-pricing-projection.service';
 import {
   IpdePricingConfigError,
@@ -58,6 +59,7 @@ export class IpdeConversationPlannerService {
     private readonly commercial: IpdeCommercialConfigService,
     private readonly issuerSelection: IpdeIssuerSelectionService,
     private readonly modelPdfs: IpdeModelPdfSelectionService,
+    private readonly mediaAssets: IpdeMediaAssetsService,
     private readonly pricing: IpdePricingService,
     private readonly pricingProjection: IpdeOrderPricingProjectionService,
   ) {}
@@ -237,6 +239,13 @@ export class IpdeConversationPlannerService {
       projectedItems,
       correctionExplicit,
     });
+    const mediaResolution = this.resolveMediaActions({
+      actions,
+      deferredIntents,
+      projectedItems,
+      subjectMutations,
+      resolvedEntries,
+    });
 
     const modelRequested = deferredIntents.includes('MODEL_PDF');
     let modelOffered = false;
@@ -270,6 +279,7 @@ export class IpdeConversationPlannerService {
     const unresolvedDeferredIntents = deferredIntents.filter(
       (intent) =>
         !pricingResolution.handledIntents.has(intent) &&
+        !mediaResolution.handledIntents.has(intent) &&
         !(modelOffered && intent === 'MODEL_PDF'),
     );
     const paymentMethodDeferred = unresolvedDeferredIntents.filter(
@@ -830,6 +840,81 @@ export class IpdeConversationPlannerService {
       },
       handledIntents,
     };
+  }
+
+  private resolveMediaActions(params: {
+    actions: IpdeOutboundAction[];
+    deferredIntents: IpdeDeferredIntent[];
+    projectedItems: ProjectedItem[];
+    subjectMutations: IpdeConversationTurnPlan['subjectMutations'];
+    resolvedEntries: SubjectCatalogEntry[];
+  }): { handledIntents: Set<IpdeDeferredIntent> } {
+    const handledIntents = new Set<IpdeDeferredIntent>();
+
+    if (params.deferredIntents.includes('PROMOTION')) {
+      const categoryCode = this.dominantCategory({
+        projectedItems: params.projectedItems,
+        subjectMutations: params.subjectMutations,
+        resolvedEntries: params.resolvedEntries,
+      });
+      const asset = this.mediaAssets.getPromotionImageForCategory({
+        tenantCode: 'IPDE',
+        categoryCode,
+      });
+      if (asset) {
+        params.actions.push(
+          this.copy.sendPromotionImage({
+            assetId: asset.id,
+            categoryCode,
+          }),
+        );
+      } else {
+        params.actions.push({
+          type: 'DEFERRED_COMMERCIAL_REQUEST',
+          intents: ['PROMOTION'],
+          reason: 'MEDIA_NOT_CONFIGURED',
+        });
+      }
+      handledIntents.add('PROMOTION');
+    }
+
+    if (params.deferredIntents.includes('PAYMENT_METHODS')) {
+      const asset = this.mediaAssets.getPaymentMethodsImage({
+        tenantCode: 'IPDE',
+      });
+      if (asset) {
+        params.actions.push(this.copy.sendPaymentMethodsImage(asset.id));
+      } else {
+        params.actions.push({
+          type: 'DEFERRED_COMMERCIAL_REQUEST',
+          intents: ['PAYMENT_METHODS'],
+          reason: 'PAYMENT_METHODS_NOT_CONFIGURED',
+        });
+      }
+      handledIntents.add('PAYMENT_METHODS');
+    }
+
+    return { handledIntents };
+  }
+
+  private dominantCategory(params: {
+    projectedItems: ProjectedItem[];
+    subjectMutations: IpdeConversationTurnPlan['subjectMutations'];
+    resolvedEntries: SubjectCatalogEntry[];
+  }): string | null {
+    const counts = new Map<string, number>();
+    for (const value of [
+      ...params.projectedItems.map((item) => item.categoryCode),
+      ...params.subjectMutations.map((subject) => subject.categoryCode ?? null),
+      ...params.resolvedEntries.map((entry) => entry.category),
+    ]) {
+      if (!value) continue;
+      counts.set(value, (counts.get(value) ?? 0) + 1);
+    }
+    const sorted = [...counts.entries()].sort(
+      (left, right) => right[1] - left[1],
+    );
+    return sorted[0]?.[0] ?? null;
   }
 
   private tryQuoteProjectedItems(projectedItems: ProjectedItem[]):

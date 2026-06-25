@@ -232,6 +232,27 @@ export class IpdeResponseCopyService {
     };
   }
 
+  sendPromotionImage(params: {
+    assetId: string;
+    categoryCode: string | null;
+  }): IpdeOutboundAction {
+    return {
+      type: 'SEND_PROMOTION_IMAGE',
+      assetId: params.assetId,
+      categoryCode: params.categoryCode,
+      messageDraft:
+        'Claro, te comparto la promoción disponible para esta opción.',
+    };
+  }
+
+  sendPaymentMethodsImage(assetId: string): IpdeOutboundAction {
+    return {
+      type: 'SEND_PAYMENT_METHODS_IMAGE',
+      assetId,
+      messageDraft: 'Claro, te envío los medios de pago disponibles.',
+    };
+  }
+
   askFullName(): IpdeOutboundAction {
     return {
       type: 'ASK_FULL_NAME',

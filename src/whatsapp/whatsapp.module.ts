@@ -8,6 +8,7 @@ import { UsageModule } from '../usage/usage.module';
 import { RulesModule } from '../rules/rules.module';
 import { AiModule } from '../ai/ai.module';
 import { KnowledgeModule } from '../knowledge/knowledge.module';
+import { WhatsappMessageGatewayService } from './whatsapp-message-gateway.service';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { KnowledgeModule } from '../knowledge/knowledge.module';
     KnowledgeModule,
   ],
   controllers: [WhatsappController],
-  providers: [WhatsappService],
+  providers: [WhatsappService, WhatsappMessageGatewayService],
+  exports: [WhatsappMessageGatewayService],
 })
 export class WhatsappModule {}
