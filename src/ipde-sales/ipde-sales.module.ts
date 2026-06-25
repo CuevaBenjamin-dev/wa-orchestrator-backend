@@ -24,6 +24,7 @@ import { IpdeCommercialConfigModule } from './commercial-config/ipde-commercial-
 import { IpdePricingModule } from './pricing/ipde-pricing.module';
 import { IpdeMediaModule } from './media/ipde-media.module';
 import { IpdeOutboundModule } from './outbound/ipde-outbound.module';
+import { IpdePaymentProofModule } from './payment-proof/ipde-payment-proof.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { IpdeOutboundModule } from './outbound/ipde-outbound.module';
     IpdePricingModule,
     IpdeMediaModule,
     IpdeOutboundModule,
+    IpdePaymentProofModule,
   ],
   providers: [
     IpdeCatalogResolutionService,
@@ -62,6 +64,7 @@ import { IpdeOutboundModule } from './outbound/ipde-outbound.module';
     IpdeCatalogResolutionService,
     IpdeConversationTurnService,
     IpdeOutboundModule,
+    IpdePaymentProofModule,
   ],
 })
 export class IpdeSalesModule {}

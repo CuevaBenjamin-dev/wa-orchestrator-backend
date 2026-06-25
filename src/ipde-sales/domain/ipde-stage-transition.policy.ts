@@ -12,6 +12,7 @@ export const IPDE_STAGE_TRANSITIONS: Readonly<
     IpdeConversationStage.WAITING_FOR_TOPIC_SELECTION,
     IpdeConversationStage.WAITING_FOR_ISSUER_VARIANT,
     IpdeConversationStage.WAITING_FOR_FULL_NAME,
+    IpdeConversationStage.PAYMENT_UNDER_REVIEW,
     IpdeConversationStage.HUMAN_TAKEOVER,
   ],
   UNDERSTANDING_REQUEST: [
@@ -22,6 +23,7 @@ export const IPDE_STAGE_TRANSITIONS: Readonly<
     IpdeConversationStage.WAITING_FOR_PRODUCT_TYPE,
     IpdeConversationStage.WAITING_FOR_ISSUER_VARIANT,
     IpdeConversationStage.WAITING_FOR_FULL_NAME,
+    IpdeConversationStage.PAYMENT_UNDER_REVIEW,
     IpdeConversationStage.HUMAN_TAKEOVER,
   ],
   WAITING_FOR_SUBJECT: [
@@ -31,11 +33,13 @@ export const IPDE_STAGE_TRANSITIONS: Readonly<
     IpdeConversationStage.WAITING_FOR_PRODUCT_TYPE,
     IpdeConversationStage.WAITING_FOR_ISSUER_VARIANT,
     IpdeConversationStage.WAITING_FOR_FULL_NAME,
+    IpdeConversationStage.PAYMENT_UNDER_REVIEW,
     IpdeConversationStage.HUMAN_TAKEOVER,
   ],
   TOPIC_LIST_READY: [
     IpdeConversationStage.WAITING_FOR_TOPIC_SELECTION,
     IpdeConversationStage.TOPICS_SELECTED,
+    IpdeConversationStage.PAYMENT_UNDER_REVIEW,
     IpdeConversationStage.HUMAN_TAKEOVER,
   ],
   WAITING_FOR_TOPIC_SELECTION: [
@@ -44,6 +48,7 @@ export const IPDE_STAGE_TRANSITIONS: Readonly<
     IpdeConversationStage.WAITING_FOR_PRODUCT_TYPE,
     IpdeConversationStage.WAITING_FOR_ISSUER_VARIANT,
     IpdeConversationStage.WAITING_FOR_FULL_NAME,
+    IpdeConversationStage.PAYMENT_UNDER_REVIEW,
     IpdeConversationStage.HUMAN_TAKEOVER,
   ],
   TOPICS_SELECTED: [
@@ -51,21 +56,25 @@ export const IPDE_STAGE_TRANSITIONS: Readonly<
     IpdeConversationStage.WAITING_FOR_ISSUER_VARIANT,
     IpdeConversationStage.WAITING_FOR_FULL_NAME,
     IpdeConversationStage.WAITING_FOR_ORDER_CONFIRMATION,
+    IpdeConversationStage.PAYMENT_UNDER_REVIEW,
     IpdeConversationStage.HUMAN_TAKEOVER,
   ],
   WAITING_FOR_PRODUCT_TYPE: [
     IpdeConversationStage.WAITING_FOR_ISSUER_VARIANT,
     IpdeConversationStage.WAITING_FOR_FULL_NAME,
     IpdeConversationStage.WAITING_FOR_ORDER_CONFIRMATION,
+    IpdeConversationStage.PAYMENT_UNDER_REVIEW,
     IpdeConversationStage.HUMAN_TAKEOVER,
   ],
   WAITING_FOR_ISSUER_VARIANT: [
     IpdeConversationStage.WAITING_FOR_FULL_NAME,
     IpdeConversationStage.WAITING_FOR_ORDER_CONFIRMATION,
+    IpdeConversationStage.PAYMENT_UNDER_REVIEW,
     IpdeConversationStage.HUMAN_TAKEOVER,
   ],
   WAITING_FOR_FULL_NAME: [
     IpdeConversationStage.WAITING_FOR_ORDER_CONFIRMATION,
+    IpdeConversationStage.PAYMENT_UNDER_REVIEW,
     IpdeConversationStage.HUMAN_TAKEOVER,
   ],
   WAITING_FOR_ORDER_CONFIRMATION: [
@@ -74,6 +83,7 @@ export const IPDE_STAGE_TRANSITIONS: Readonly<
     IpdeConversationStage.WAITING_FOR_PRODUCT_TYPE,
     IpdeConversationStage.WAITING_FOR_ISSUER_VARIANT,
     IpdeConversationStage.WAITING_FOR_FULL_NAME,
+    IpdeConversationStage.PAYMENT_UNDER_REVIEW,
     IpdeConversationStage.HUMAN_TAKEOVER,
   ],
   WAITING_FOR_PAYMENT: [

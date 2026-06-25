@@ -2,9 +2,9 @@
 
 ## Propósito
 
-`IpdeSalesModule` conserva el estado comercial de IPDE y los pedidos asociados sin acoplarlos al webhook, a OpenAI ni al catálogo. El módulo permite recordar la etapa actual, la pausa humana, el pedido activo, las materias, los temas, el producto, el emisor, el nombre informado, la cotización y el estado de pago.
+`IpdeSalesModule` conserva el estado comercial de IPDE y los pedidos asociados sin acoplarlos al webhook, a OpenAI ni al catálogo. El módulo permite recordar la etapa actual, la pausa humana, el pedido activo, las materias, los temas, el producto, el emisor, el nombre informado, la cotización, el estado de pago y las referencias de comprobantes recibidos.
 
-El módulo exporta únicamente `IpdeConversationStateService` e `IpdeOrderService`. No contiene controllers ni endpoints HTTP.
+El módulo exporta los servicios de estado, pedido, motor conversacional, outbound y comprobantes. No contiene controllers ni endpoints HTTP.
 
 ## Conceptos
 
@@ -14,6 +14,7 @@ El módulo exporta únicamente `IpdeConversationStateService` e `IpdeOrderServic
 - `IpdeOrder` representa una solicitud comercial. Un estado conserva todos sus pedidos históricos y puede señalar uno solo como activo.
 - `IpdeSubjectRequest` conserva una materia solicitada.
 - `IpdeOrderItem` conserva un tema o mención elegido y sus opciones comerciales configurables.
+- `IpdePaymentProof` conserva una referencia lógica a un comprobante recibido por WhatsApp. No guarda ni descarga el archivo.
 
 ## Enums
 
@@ -27,6 +28,8 @@ El módulo exporta únicamente `IpdeConversationStateService` e `IpdeOrderServic
 
 `IpdePaymentStatus` reserva `NOT_REQUESTED`, `AWAITING_PROOF`, `PROOF_RECEIVED`, `UNDER_REVIEW`, `APPROVED` y `REJECTED`. Este bloque no aprueba ni rechaza pagos.
 
+`IpdePaymentProofStatus` reserva `RECEIVED`, `UNDER_REVIEW`, `APPROVED`, `REJECTED` e `IGNORED`. La recepción automática solo usa `UNDER_REVIEW`; los estados de aprobación, rechazo o descarte quedan para revisión humana futura.
+
 `IpdeSubjectRequestStatus` usa `REQUESTED`, `LIST_PRESENTED`, `SELECTION_COMPLETE` y `CANCELLED`. `IpdeOrderItemStatus` usa `DRAFT`, `CONFIRMED` y `REMOVED`.
 
 ## Modelos y relaciones
@@ -38,6 +41,8 @@ El módulo exporta únicamente `IpdeConversationStateService` e `IpdeOrderServic
 `IpdeSubjectRequest` pertenece al tenant y al pedido. La combinación `(orderId, normalizedName)` es única.
 
 `IpdeOrderItem` pertenece al tenant y al pedido y puede pertenecer a una materia. Se eligió la restricción única `(orderId, normalizedTopicName)`. Esto evita duplicados incluso cuando `subjectRequestId` es `NULL`; en PostgreSQL, una restricción que incluyera la columna nullable permitiría varias filas equivalentes con `NULL`. Por ahora una misma denominación no se repite dentro del pedido aunque provenga de materias distintas.
+
+`IpdePaymentProof` pertenece siempre al tenant y puede apuntar al pedido activo, estado, conversación y lead. `orderId` es opcional para respetar la regla de negocio de no inventar un pedido cuando llega un comprobante sin pedido activo; en ese caso se conserva la referencia asociada a conversación/lead y se pausa la automatización.
 
 `catalogEntryId` y `catalogTopicId` son referencias lógicas a JSON, no claves foráneas. `catalogSource`, `productTypeCode`, `issuerCode` e `issuerVariantCode` permanecen como strings para poder incorporar opciones sin migrar la base de datos.
 
@@ -69,16 +74,9 @@ Las operaciones de pausa y reanudación también incrementan la versión. La pau
 
 La política es un mapa declarativo en `ipde-stage-transition.policy.ts`. Las transiciones permitidas son:
 
-- `NEW` -> `UNDERSTANDING_REQUEST`, `WAITING_FOR_SUBJECT`, `TOPICS_SELECTED`, `WAITING_FOR_PRODUCT_TYPE`, `WAITING_FOR_FULL_NAME`, `HUMAN_TAKEOVER`.
-- `UNDERSTANDING_REQUEST` -> `WAITING_FOR_SUBJECT`, `TOPIC_LIST_READY`, `TOPICS_SELECTED`, `HUMAN_TAKEOVER`.
-- `WAITING_FOR_SUBJECT` -> `TOPIC_LIST_READY`, `TOPICS_SELECTED`, `HUMAN_TAKEOVER`.
-- `TOPIC_LIST_READY` -> `WAITING_FOR_TOPIC_SELECTION`, `TOPICS_SELECTED`, `HUMAN_TAKEOVER`.
-- `WAITING_FOR_TOPIC_SELECTION` -> `TOPICS_SELECTED`, `WAITING_FOR_SUBJECT`, `HUMAN_TAKEOVER`.
-- `TOPICS_SELECTED` -> `WAITING_FOR_PRODUCT_TYPE`, `WAITING_FOR_ISSUER_VARIANT`, `WAITING_FOR_FULL_NAME`, `WAITING_FOR_ORDER_CONFIRMATION`, `HUMAN_TAKEOVER`.
-- `WAITING_FOR_PRODUCT_TYPE` -> `WAITING_FOR_ISSUER_VARIANT`, `WAITING_FOR_FULL_NAME`, `WAITING_FOR_ORDER_CONFIRMATION`, `HUMAN_TAKEOVER`.
-- `WAITING_FOR_ISSUER_VARIANT` -> `WAITING_FOR_FULL_NAME`, `WAITING_FOR_ORDER_CONFIRMATION`, `HUMAN_TAKEOVER`.
-- `WAITING_FOR_FULL_NAME` -> `WAITING_FOR_ORDER_CONFIRMATION`, `HUMAN_TAKEOVER`.
-- `WAITING_FOR_ORDER_CONFIRMATION` -> `WAITING_FOR_PAYMENT`, `WAITING_FOR_TOPIC_SELECTION`, `WAITING_FOR_PRODUCT_TYPE`, `WAITING_FOR_ISSUER_VARIANT`, `WAITING_FOR_FULL_NAME`, `HUMAN_TAKEOVER`.
+- `NEW`, `UNDERSTANDING_REQUEST` y `WAITING_FOR_SUBJECT` pueden avanzar hacia captura comercial, revisión de pago o `HUMAN_TAKEOVER`.
+- `TOPIC_LIST_READY` y `WAITING_FOR_TOPIC_SELECTION` pueden avanzar hacia selección, revisión de pago o `HUMAN_TAKEOVER`.
+- `TOPICS_SELECTED`, `WAITING_FOR_PRODUCT_TYPE`, `WAITING_FOR_ISSUER_VARIANT`, `WAITING_FOR_FULL_NAME` y `WAITING_FOR_ORDER_CONFIRMATION` pueden avanzar por los datos comerciales faltantes, corregir datos explícitos, pasar a revisión de pago o `HUMAN_TAKEOVER`.
 - `WAITING_FOR_PAYMENT` -> `PAYMENT_UNDER_REVIEW`, `HUMAN_TAKEOVER`.
 - `PAYMENT_UNDER_REVIEW` -> `HUMAN_TAKEOVER`.
 - `HUMAN_TAKEOVER` -> `READY_FOR_ISSUANCE`, `COMPLETED`.
@@ -106,11 +104,12 @@ Los nombres solo normalizan espacios; no se cambian letras, tildes ni mayúscula
 - `IpdeOrder.conversationStateId`, `IpdeSubjectRequest.orderId` e `IpdeOrderItem.orderId` usan `CASCADE`: los hijos forman parte del agregado propietario.
 - `IpdeConversationState.activeOrderId` usa `SET NULL`: eliminar un pedido no debe dejar un puntero activo inválido ni provocar un ciclo de cascadas.
 - `IpdeOrderItem.subjectRequestId` usa `SET NULL`: el ítem histórico puede conservarse aunque se elimine la clasificación opcional de materia.
+- `IpdePaymentProof.orderId`, `conversationStateId`, `conversationId` y `leadId` usan `SET NULL`: la referencia de auditoría puede sobrevivir a la eliminación deliberada de agregados hijos, siempre bajo el tenant.
 
 La migración solo crea enums, tablas, índices y relaciones. No modifica filas ni columnas existentes.
 
 ## Fuera de la integración actual
 
-Este bloque no modifica `WhatsappService`, no importa `IpdeSalesModule` desde `WhatsappModule`, no llama OpenAI o Meta, no consulta ni escribe el catálogo, no procesa comprobantes, no envía archivos ni mensajes y no expone endpoints.
+Este bloque no modifica `WhatsappService`, no importa `IpdeSalesModule` desde `WhatsappModule`, no llama OpenAI o Meta, no consulta ni escribe el catálogo, no descarga comprobantes, no envía archivos ni mensajes reales y no expone endpoints.
 
-En bloques posteriores, el orquestador podrá resolver el tenant estable `IPDE`, crear o recuperar el estado después de identificar conversación y lead, consultar el catálogo mediante sus contratos existentes y avanzar solo mediante estos servicios. La recepción de comprobantes deberá registrar el evento, pasar a revisión y mantener la automatización pausada; la aprobación seguirá siendo una acción humana.
+En bloques posteriores, el orquestador podrá resolver el tenant estable `IPDE`, crear o recuperar el estado después de identificar conversación y lead, consultar el catálogo mediante sus contratos existentes y avanzar solo mediante estos servicios. La aprobación o rechazo de comprobantes seguirá siendo una acción humana.

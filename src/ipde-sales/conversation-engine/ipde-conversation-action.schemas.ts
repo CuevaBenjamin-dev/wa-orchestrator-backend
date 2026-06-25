@@ -304,6 +304,13 @@ const RequestHumanTakeoverSchema = z
   })
   .strict();
 
+const PaymentProofReceivedSchema = z
+  .object({
+    type: z.literal('PAYMENT_PROOF_RECEIVED'),
+    messageDraft: DraftSchema,
+  })
+  .strict();
+
 export const IpdeDeferredIntentSchema = z.enum([
   'PRICE',
   'DISCOUNT',
@@ -345,6 +352,7 @@ export const IpdeOutboundActionSchema = z.discriminatedUnion('type', [
   ConfirmFullNameSchema,
   AskOrderConfirmationSchema,
   RequestHumanTakeoverSchema,
+  PaymentProofReceivedSchema,
   DeferredCommercialRequestSchema,
 ]);
 

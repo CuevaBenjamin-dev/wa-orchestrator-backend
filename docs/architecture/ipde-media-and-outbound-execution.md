@@ -7,7 +7,7 @@ El Bloque 8 agrega la capa que resuelve recursos multimedia de IPDE y ejecuta ac
 1. `src/ipde-sales/media`: carga y valida la configuración manual de imágenes.
 2. `src/ipde-sales/outbound`: convierte acciones IPDE en envíos de texto, imagen o documento mediante un gateway de WhatsApp.
 
-Esta capa no está conectada todavía al webhook principal. Tampoco guarda mensajes salientes en `Message`, no modifica pedidos, no procesa comprobantes y no confirma pagos.
+Esta capa no está conectada todavía al webhook principal. Tampoco guarda mensajes salientes en `Message`, no confirma pagos y no aprueba comprobantes. Desde el Bloque 9 puede ejecutar como texto la acción determinista que informa que un comprobante fue recibido.
 
 ## Archivo `media-assets.json`
 
@@ -166,6 +166,12 @@ La acción envía primero texto y luego imagen. No cambia `paymentStatus`, no pa
 
 El executor resuelve cada ID contra `model-pdf-assets.json`. Solo envía documento cuando el asset activo tiene `whatsappMediaId`, `publicUrl` o `storageKey`. Si el manifiesto contiene solo placeholder sin ubicación real, envía únicamente el texto de la oferta y no inventa archivos.
 
+## Comprobantes recibidos
+
+`PAYMENT_PROOF_RECEIVED` es una acción de texto simple. El executor la trata como cualquier acción con `messageDraft`; en dry-run no llama a Meta y devuelve un resultado simulado.
+
+El Bloque 9 agregó utilidades puras en `src/whatsapp/whatsapp-media-message.utils.ts` para extraer metadata de mensajes `image` y `document` de WhatsApp: `providerMessageId`, `providerMediaId`, `mimeType`, `fileName`, `caption` y `sha256`. Estas utilidades no descargan archivos, no consultan Meta y todavía no están conectadas a `WhatsappService.handleIncomingWebhook`.
+
 ## Comando de validación
 
 ```bash
@@ -181,13 +187,13 @@ Este bloque no:
 - conecta `IpdeConversationTurnService` al webhook;
 - modifica `WhatsappService.handleIncomingWebhook`;
 - persiste mensajes salientes;
-- procesa comprobantes;
+- aprueba, rechaza, descarga o interpreta comprobantes;
 - confirma, aprueba o rechaza pagos;
 - genera PDFs finales;
 - crea endpoints, controllers, jobs o cron;
 - modifica Prisma o migraciones;
 - hace llamadas reales en pruebas.
 
-## Pendiente para Bloques 9 y 10
+## Pendiente para Bloque 10
 
-Bloque 9 deberá manejar comprobantes y pausa humana asociada. Bloque 10 podrá integrar el motor IPDE con el webhook real, persistir mensajes salientes y ejecutar esta capa respetando idempotencia, tenant isolation y `WHATSAPP_SEND_ENABLED`.
+Bloque 10 podrá integrar el motor IPDE con el webhook real, persistir mensajes salientes y ejecutar esta capa respetando idempotencia, tenant isolation y `WHATSAPP_SEND_ENABLED`.

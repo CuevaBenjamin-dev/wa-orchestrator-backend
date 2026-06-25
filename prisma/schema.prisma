@@ -83,6 +83,14 @@ enum IpdePaymentStatus {
   REJECTED
 }
 
+enum IpdePaymentProofStatus {
+  RECEIVED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  IGNORED
+}
+
 enum IpdeSubjectRequestStatus {
   REQUESTED
   LIST_PRESENTED
@@ -113,6 +121,7 @@ model Tenant {
 
   ipdeConversationStates IpdeConversationState[]
   ipdeOrders             IpdeOrder[]
+  ipdePaymentProofs      IpdePaymentProof[]
   ipdeSubjectRequests    IpdeSubjectRequest[]
   ipdeOrderItems         IpdeOrderItem[]
 
@@ -150,6 +159,7 @@ model Lead {
   conversations Conversation[]
 
   ipdeConversationStates IpdeConversationState[]
+  ipdePaymentProofs      IpdePaymentProof[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -169,6 +179,7 @@ model Conversation {
   messages Message[]
 
   ipdeConversationState IpdeConversationState?
+  ipdePaymentProofs     IpdePaymentProof[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -268,11 +279,12 @@ model IpdeConversationState {
   lastTransitionAt DateTime              @default(now())
   activeOrderId    String?               @unique
 
-  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  lead         Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  orders       IpdeOrder[]  @relation("IpdeStateOrders")
-  activeOrder  IpdeOrder?   @relation("IpdeActiveOrder", fields: [activeOrderId], references: [id], onDelete: SetNull)
+  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lead          Lead               @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  conversation  Conversation       @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  orders        IpdeOrder[]        @relation("IpdeStateOrders")
+  activeOrder   IpdeOrder?         @relation("IpdeActiveOrder", fields: [activeOrderId], references: [id], onDelete: SetNull)
+  paymentProofs IpdePaymentProof[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -304,6 +316,7 @@ model IpdeOrder {
   activeForState    IpdeConversationState? @relation("IpdeActiveOrder")
   subjectRequests   IpdeSubjectRequest[]
   items             IpdeOrderItem[]
+  paymentProofs     IpdePaymentProof[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -311,6 +324,44 @@ model IpdeOrder {
   @@index([tenantId, status])
   @@index([conversationStateId, createdAt])
   @@index([paymentStatus])
+}
+
+model IpdePaymentProof {
+  id                  String                 @id @default(uuid())
+  tenantId            String
+  orderId             String?
+  conversationStateId String?
+  conversationId      String?
+  leadId              String?
+  status              IpdePaymentProofStatus @default(RECEIVED)
+  provider            String                 @default("WHATSAPP")
+  providerMessageId   String?
+  providerMediaId     String
+  mediaType           String
+  mimeType            String?
+  fileName            String?
+  caption             String?
+  sha256              String?
+  receivedAt          DateTime               @default(now())
+  reviewedAt          DateTime?
+  reviewNotes         String?
+
+  tenant            Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order             IpdeOrder?             @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  conversationState IpdeConversationState? @relation(fields: [conversationStateId], references: [id], onDelete: SetNull)
+  conversation      Conversation?          @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  lead              Lead?                  @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, providerMessageId])
+  @@index([tenantId, status])
+  @@index([orderId, receivedAt])
+  @@index([providerMessageId])
+  @@index([providerMediaId])
+  @@index([tenantId, providerMediaId])
+  @@index([conversationId, receivedAt])
 }
 
 model IpdeSubjectRequest {

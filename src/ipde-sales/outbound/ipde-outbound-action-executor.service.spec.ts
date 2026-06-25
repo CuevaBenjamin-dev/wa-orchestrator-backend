@@ -40,6 +40,34 @@ describe('IpdeOutboundActionExecutorService', () => {
     ]);
   });
 
+  it('executes the payment proof received action as a dry-run text', async () => {
+    const harness = createHarness();
+    const result = await harness.executor.execute(
+      input([
+        IpdeOutboundActionSchema.parse({
+          type: 'PAYMENT_PROOF_RECEIVED',
+          messageDraft:
+            'Perfecto, ya recibí tu comprobante.\nVamos a verificar que el pago se haya realizado correctamente. Dame un momento, por favor.',
+        }),
+      ]),
+    );
+
+    expect(result.actionResults).toEqual([
+      expect.objectContaining({
+        actionType: 'PAYMENT_PROOF_RECEIVED',
+        sequence: 1,
+        success: true,
+        simulated: true,
+      }),
+    ]);
+    expect(harness.gateway.sent).toEqual([
+      {
+        kind: 'text',
+        text: 'Perfecto, ya recibí tu comprobante.\nVamos a verificar que el pago se haya realizado correctamente. Dame un momento, por favor.',
+      },
+    ]);
+  });
+
   it('executes topic list chunks in order', async () => {
     const harness = createHarness();
     const result = await harness.executor.execute(

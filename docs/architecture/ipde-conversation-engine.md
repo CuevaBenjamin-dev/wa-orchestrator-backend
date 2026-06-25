@@ -19,7 +19,7 @@ El motor sí puede:
 - pausar la automatización cuando el usuario pide una persona;
 - producir acciones salientes estrictas y borradores deterministas.
 
-El motor calcula precios únicamente mediante la configuración manual de pricing del Bloque 7. Desde el Bloque 8 también puede producir acciones visuales para promoción y medios de pago cuando existe un asset multimedia activo, pero sigue sin ejecutar el envío por sí mismo. No valida pagos, procesa comprobantes, genera PDFs finales, usa búsqueda web ni modifica `UsageDaily`. La validación comercial de emisores pertenece al módulo de configuración de IPDE. Tampoco introduce controllers, endpoints, jobs, cron, cambios de Prisma o integración con `WhatsappService.handleIncomingWebhook`.
+El motor calcula precios únicamente mediante la configuración manual de pricing del Bloque 7. Desde el Bloque 8 también puede producir acciones visuales para promoción y medios de pago cuando existe un asset multimedia activo, pero sigue sin ejecutar el envío por sí mismo. El Bloque 9 registra comprobantes en un servicio separado; este motor de texto no valida pagos, no descarga archivos, no aprueba comprobantes, no genera PDFs finales, no usa búsqueda web ni modifica `UsageDaily`. La validación comercial de emisores pertenece al módulo de configuración de IPDE. Tampoco introduce controllers, endpoints, jobs, cron o integración con `WhatsappService.handleIncomingWebhook`.
 
 ## Flujo
 
@@ -147,6 +147,8 @@ Las intenciones `PRICE`, `DISCOUNT` y parte de `PROMOTION` se resuelven cuando e
 Cuando el cliente solicita promoción y existe una imagen activa en `media-assets.json`, el planner añade `SEND_PROMOTION_IMAGE`. Cuando solicita medios de pago y existe `PAYMENT_METHODS_IMAGE`, añade `SEND_PAYMENT_METHODS_IMAGE`. En ambos casos solo produce la acción; la ejecución queda en `IpdeOutboundActionExecutorService`. Si falta media, conserva un `DEFERRED_COMMERCIAL_REQUEST` con razón segura.
 
 `PAYMENT_PROOF_MENTION` sigue diferido. `MODEL_PDF` produce `OFFER_MODEL_PDF_OPTIONS` cuando el pedido tiene producto y emisor completos y existe un modelo activo; la acción omite toda ubicación interna. El executor del Bloque 8 resuelve el ID contra el manifiesto autorizado y solo envía documentos si existe media real configurada. Si la combinación completa no está configurada, se difiere con `MEDIA_NOT_CONFIGURED`.
+
+La recepción real de una imagen o documento de comprobante no pasa por `processTurn`. `IpdePaymentProofService.registerPaymentProof` registra la referencia de media, mueve pedido/estado a revisión y devuelve la acción `PAYMENT_PROOF_RECEIVED` con texto determinista. Los duplicados no generan una segunda acción.
 
 ## Resultado, métricas y logs
 
