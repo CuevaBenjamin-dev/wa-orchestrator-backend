@@ -8,6 +8,7 @@ import { UsageService } from '../usage/usage.service';
 import { RulesService } from '../rules/rules.service';
 import { AiService } from '../ai/ai.service';
 import { KnowledgeService } from '../knowledge/knowledge.service';
+import { IpdeWhatsappOrchestratorService } from '../ipde-sales/whatsapp/ipde-whatsapp-orchestrator.service';
 
 @Injectable()
 export class WhatsappService {
@@ -22,6 +23,7 @@ export class WhatsappService {
     private readonly rulesService: RulesService,
     private readonly aiService: AiService,
     private readonly knowledgeService: KnowledgeService,
+    private readonly ipdeWhatsapp: IpdeWhatsappOrchestratorService,
   ) {}
 
   /**
@@ -197,6 +199,24 @@ export class WhatsappService {
 
               continue;
             }
+          }
+
+          if (
+            this.ipdeWhatsapp.canHandleTenant({
+              tenant,
+              phoneNumberId,
+            })
+          ) {
+            results.push(
+              await this.ipdeWhatsapp.handleIncomingMessage({
+                tenant,
+                phoneNumberId,
+                message,
+                contacts,
+              }),
+            );
+
+            continue;
           }
 
           /**

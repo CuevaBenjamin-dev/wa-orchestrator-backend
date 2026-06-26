@@ -8,7 +8,8 @@ import { UsageModule } from '../usage/usage.module';
 import { RulesModule } from '../rules/rules.module';
 import { AiModule } from '../ai/ai.module';
 import { KnowledgeModule } from '../knowledge/knowledge.module';
-import { WhatsappMessageGatewayService } from './whatsapp-message-gateway.service';
+import { IpdeWhatsappModule } from '../ipde-sales/whatsapp/ipde-whatsapp.module';
+import { WhatsappGatewayModule } from './whatsapp-gateway.module';
 
 @Module({
   imports: [
@@ -19,9 +20,11 @@ import { WhatsappMessageGatewayService } from './whatsapp-message-gateway.servic
     RulesModule,
     AiModule,
     KnowledgeModule,
+    WhatsappGatewayModule,
+    IpdeWhatsappModule,
   ],
   controllers: [WhatsappController],
-  providers: [WhatsappService, WhatsappMessageGatewayService],
-  exports: [WhatsappMessageGatewayService],
+  providers: [WhatsappService],
+  exports: [WhatsappGatewayModule],
 })
 export class WhatsappModule {}
