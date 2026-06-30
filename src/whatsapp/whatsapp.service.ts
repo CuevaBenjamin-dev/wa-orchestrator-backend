@@ -181,6 +181,24 @@ export class WhatsappService {
           const telefonoDelUsuario = message?.from;
           const idExternoWhatsapp = message?.id;
 
+          if (
+            this.ipdeWhatsapp.canHandleTenant({
+              tenant,
+              phoneNumberId,
+            })
+          ) {
+            results.push(
+              await this.ipdeWhatsapp.handleIncomingMessage({
+                tenant,
+                phoneNumberId,
+                message,
+                contacts,
+              }),
+            );
+
+            continue;
+          }
+
           /**
            * Evitamos procesar dos veces el mismo mensaje de WhatsApp.
            * Meta puede reintentar webhooks si hubo demora, error o falta de 200.
@@ -199,24 +217,6 @@ export class WhatsappService {
 
               continue;
             }
-          }
-
-          if (
-            this.ipdeWhatsapp.canHandleTenant({
-              tenant,
-              phoneNumberId,
-            })
-          ) {
-            results.push(
-              await this.ipdeWhatsapp.handleIncomingMessage({
-                tenant,
-                phoneNumberId,
-                message,
-                contacts,
-              }),
-            );
-
-            continue;
           }
 
           /**

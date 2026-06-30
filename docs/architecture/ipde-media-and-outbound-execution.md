@@ -6,8 +6,9 @@ El Bloque 8 agrega la capa que resuelve recursos multimedia de IPDE y ejecuta ac
 
 1. `src/ipde-sales/media`: carga y valida la configuración manual de imágenes.
 2. `src/ipde-sales/outbound`: convierte acciones IPDE en envíos de texto, imagen o documento mediante un gateway de WhatsApp.
+3. `src/ipde-sales/outbound-delivery`: desde Bloque 11, persiste las acciones en un outbox antes de ejecutarlas desde el webhook.
 
-Esta capa no está conectada todavía al webhook principal. Tampoco guarda mensajes salientes en `Message`, no confirma pagos y no aprueba comprobantes. Desde el Bloque 9 puede ejecutar como texto la acción determinista que informa que un comprobante fue recibido.
+La ejecución directa sigue disponible como capa baja, pero el webhook IPDE usa el outbox persistente. Los mensajes salientes se guardan en `Message` solo después de una entrega `SENT` o simulada correctamente. Esta capa no confirma pagos y no aprueba comprobantes.
 
 ## Archivo `media-assets.json`
 
@@ -121,7 +122,20 @@ El gateway no registra access tokens ni payload completo. El dry-run puede regis
 
 Devuelve resultados por envío preparado, con secuencia, éxito, simulación, provider ID y código de error seguro.
 
-No escribe en base de datos. El webhook futuro será responsable de persistir mensajes salientes y provider IDs.
+No escribe en base de datos. Desde Bloque 11, el webhook usa `IpdeOutboundDeliveryService`, que planifica entregas persistentes, ejecuta las pendientes y registra `providerMessageId` cuando Meta devuelve ID.
+
+## Outbox de entregas
+
+`IpdeOutboundDeliveryService` recibe acciones del motor, crea entregas con secuencia estable y evita duplicados mediante `tenantId + inboundExternalId + sequence`.
+
+Los payloads persistidos son seguros:
+
+- texto;
+- ID lógico de asset de imagen;
+- ID lógico de PDF referencial;
+- texto seguro para persistir como `Message`.
+
+No se persisten URLs privadas, tokens, `storageKey` ni rutas locales. En dry-run, el mensaje `ASSISTANT` usa `externalId` estable `ipde-outbox:<deliveryId>`.
 
 ## Orden de ejecución
 
@@ -196,4 +210,4 @@ Este bloque no:
 
 ## Pendiente para Bloque 10
 
-Bloque 10 podrá integrar el motor IPDE con el webhook real, persistir mensajes salientes y ejecutar esta capa respetando idempotencia, tenant isolation y `WHATSAPP_SEND_ENABLED`.
+Un runner futuro podrá invocar `retryPending` para reintentar entregas pendientes fuera del reintento natural de Meta. Bloque 11 no agrega worker ni cron.

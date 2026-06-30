@@ -111,9 +111,35 @@ describe('WhatsappService', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('ignores duplicated WhatsApp messages before IPDE or legacy processing', async () => {
+  it('delegates duplicated IPDE messages so pending outbox can be retried', async () => {
     const harness = createHarness({
       ipdeCanHandle: true,
+      existingExternalMessage: { id: 'existing-message' },
+    });
+
+    await expect(
+      harness.service.handleIncomingWebhook(webhookPayload(textMessage())),
+    ).resolves.toEqual({
+      processed: 1,
+      results: [
+        {
+          status: 'ipde_text_processed',
+          tenantId: 'tenant-1',
+          leadId: 'lead-1',
+          conversationId: 'conversation-1',
+          from: '51999999999',
+        },
+      ],
+    });
+    expect(harness.ipdeWhatsapp.canHandleTenant).toHaveBeenCalled();
+    expect(harness.ipdeWhatsapp.handleIncomingMessage).toHaveBeenCalled();
+    expect(harness.conversations.findByExternalId).not.toHaveBeenCalled();
+    expect(harness.leads.findOrCreateLead).not.toHaveBeenCalled();
+  });
+
+  it('keeps legacy duplicate protection for non-IPDE tenants', async () => {
+    const harness = createHarness({
+      ipdeCanHandle: false,
       existingExternalMessage: { id: 'existing-message' },
     });
 
@@ -128,7 +154,6 @@ describe('WhatsappService', () => {
         },
       ],
     });
-    expect(harness.ipdeWhatsapp.canHandleTenant).not.toHaveBeenCalled();
     expect(harness.ipdeWhatsapp.handleIncomingMessage).not.toHaveBeenCalled();
     expect(harness.leads.findOrCreateLead).not.toHaveBeenCalled();
   });

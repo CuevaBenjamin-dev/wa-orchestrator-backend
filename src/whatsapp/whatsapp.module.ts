@@ -10,6 +10,7 @@ import { AiModule } from '../ai/ai.module';
 import { KnowledgeModule } from '../knowledge/knowledge.module';
 import { IpdeWhatsappModule } from '../ipde-sales/whatsapp/ipde-whatsapp.module';
 import { WhatsappGatewayModule } from './whatsapp-gateway.module';
+import { WhatsappSignatureService } from './security/whatsapp-signature.service';
 
 @Module({
   imports: [
@@ -24,7 +25,7 @@ import { WhatsappGatewayModule } from './whatsapp-gateway.module';
     IpdeWhatsappModule,
   ],
   controllers: [WhatsappController],
-  providers: [WhatsappService],
+  providers: [WhatsappService, WhatsappSignatureService],
   exports: [WhatsappGatewayModule],
 })
 export class WhatsappModule {}

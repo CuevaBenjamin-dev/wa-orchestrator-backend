@@ -1,8 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { MessageRole } from '@prisma/client';
+import {
+  IpdeOutboundDelivery,
+  IpdeOutboundDeliveryStatus,
+  MessageRole,
+} from '@prisma/client';
 import { ConversationsService } from '../../conversations/conversations.service';
 import { IpdeOutboundAction } from '../conversation-engine/ipde-conversation-action.schemas';
 import { IpdeOutboundExecutionActionResult } from '../outbound/ipde-outbound-action-executor.types';
+import { IpdeOutboundDeliveryPayloadSchema } from '../outbound-delivery/ipde-outbound-delivery.schemas';
 import { IpdeWhatsappOutboundPersistenceInput } from './ipde-whatsapp.types';
 
 interface PlannedOutboundMessage {
@@ -13,6 +18,43 @@ interface PlannedOutboundMessage {
 @Injectable()
 export class IpdeWhatsappOutboundPersistenceService {
   constructor(private readonly conversations: ConversationsService) {}
+
+  async persistDeliveredMessages(params: {
+    deliveries: IpdeOutboundDelivery[];
+  }): Promise<number> {
+    let persisted = 0;
+    const sentDeliveries = params.deliveries
+      .filter((delivery) => delivery.status === IpdeOutboundDeliveryStatus.SENT)
+      .sort((left, right) => left.sequence - right.sequence);
+
+    for (const delivery of sentDeliveries) {
+      const payload = IpdeOutboundDeliveryPayloadSchema.safeParse(
+        delivery.payloadJson,
+      );
+      if (!payload.success) {
+        continue;
+      }
+
+      const externalId =
+        delivery.providerMessageId ?? `ipde-outbox:${delivery.id}`;
+      const existing = await this.conversations.findByExternalId(externalId);
+      if (existing) {
+        continue;
+      }
+
+      await this.conversations.addMessage({
+        conversationId: delivery.conversationId,
+        role: MessageRole.ASSISTANT,
+        content: payload.data.contentForMessage,
+        externalId,
+        tokensInput: 0,
+        tokensOutput: 0,
+      });
+      persisted += 1;
+    }
+
+    return persisted;
+  }
 
   async persistExecutedMessages(
     input: IpdeWhatsappOutboundPersistenceInput,

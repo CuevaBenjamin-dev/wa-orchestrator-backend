@@ -14,8 +14,8 @@ import { IpdeConversationTurnResult } from '../conversation-engine/ipde-conversa
 import { IpdeConversationTurnService } from '../conversation-engine/ipde-conversation-turn.service';
 import { IpdeOrderService } from '../services/ipde-order.service';
 import { IpdeConversationStateService } from '../services/ipde-conversation-state.service';
-import { IpdeOutboundActionExecutorService } from '../outbound/ipde-outbound-action-executor.service';
-import { IpdeOutboundExecutionResult } from '../outbound/ipde-outbound-action-executor.types';
+import { IpdeOutboundDeliveryService } from '../outbound-delivery/ipde-outbound-delivery.service';
+import { IpdeOutboundDeliveryExecutionResult } from '../outbound-delivery/ipde-outbound-delivery.types';
 import { IpdePaymentProofDetectorService } from '../payment-proof/ipde-payment-proof-detector.service';
 import { IpdePaymentProofService } from '../payment-proof/ipde-payment-proof.service';
 import {
@@ -64,19 +64,26 @@ describe('IpdeWhatsappOrchestratorService', () => {
       tokensInput: 31,
       tokensOutput: 7,
     });
-    expect(harness.executor.execute).toHaveBeenCalledWith({
+    expect(harness.deliveries.createFromActions).toHaveBeenCalledWith({
+      tenantId: 'tenant-1',
+      leadId: 'lead-1',
+      conversationId: 'conversation-1',
+      orderId: undefined,
+      inboundMessageId: 'inbound-1',
+      inboundExternalId: 'wamid.text-1',
+      actions: defaultTurn().outboundActions,
+    });
+    expect(harness.deliveries.executePendingForInbound).toHaveBeenCalledWith({
       tenantCode: 'IPDE',
       tenantId: 'tenant-1',
       phoneNumberId: 'ipde-phone-id',
       to: '51999999999',
-      actions: defaultTurn().outboundActions,
+      inboundExternalId: 'wamid.text-1',
     });
     expect(
-      harness.outboundPersistence.persistExecutedMessages,
+      harness.outboundPersistence.persistDeliveredMessages,
     ).toHaveBeenCalledWith({
-      conversationId: 'conversation-1',
-      actions: defaultTurn().outboundActions,
-      execution: defaultExecution(),
+      deliveries: defaultDeliveryExecution().deliveries,
     });
   });
 
@@ -91,26 +98,36 @@ describe('IpdeWhatsappOrchestratorService', () => {
       status: 'ipde_text_processed',
       outboundExecution: null,
     });
-    expect(harness.executor.execute).not.toHaveBeenCalled();
+    expect(harness.deliveries.createFromActions).not.toHaveBeenCalled();
+    expect(harness.deliveries.executePendingForInbound).not.toHaveBeenCalled();
     expect(
-      harness.outboundPersistence.persistExecutedMessages,
+      harness.outboundPersistence.persistDeliveredMessages,
     ).not.toHaveBeenCalled();
   });
 
-  it('ignores duplicated WhatsApp messages before creating lead or executing the engine', async () => {
+  it('retries pending outbox on duplicated WhatsApp messages without calling the engine', async () => {
     const harness = createHarness({
       existingExternalMessage: { id: 'already-processed' },
     });
 
     await expect(
       harness.service.handleIncomingMessage(textInput()),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       status: 'duplicated_message_ignored',
       externalId: 'wamid.text-1',
     });
     expect(harness.leads.findOrCreateLead).not.toHaveBeenCalled();
     expect(harness.turns.processTurn).not.toHaveBeenCalled();
-    expect(harness.executor.execute).not.toHaveBeenCalled();
+    expect(harness.deliveries.executePendingForInbound).toHaveBeenCalledWith({
+      tenantCode: 'IPDE',
+      tenantId: 'tenant-1',
+      phoneNumberId: 'ipde-phone-id',
+      to: '51999999999',
+      inboundExternalId: 'wamid.text-1',
+    });
+    expect(
+      harness.outboundPersistence.persistDeliveredMessages,
+    ).toHaveBeenCalled();
   });
 
   it('returns a structured processing error if the text engine fails', async () => {
@@ -125,7 +142,7 @@ describe('IpdeWhatsappOrchestratorService', () => {
       externalId: 'wamid.text-1',
       errorCode: 'Error',
     });
-    expect(harness.executor.execute).not.toHaveBeenCalled();
+    expect(harness.deliveries.createFromActions).not.toHaveBeenCalled();
   });
 
   it('registers probable image payment proofs without calling the text engine', async () => {
@@ -165,7 +182,7 @@ describe('IpdeWhatsappOrchestratorService', () => {
         caption: 'voucher yape',
       }),
     );
-    expect(harness.executor.execute).toHaveBeenCalledWith(
+    expect(harness.deliveries.createFromActions).toHaveBeenCalledWith(
       expect.objectContaining({
         actions: defaultProofRegistration().outboundActions,
       }),
@@ -220,7 +237,8 @@ describe('IpdeWhatsappOrchestratorService', () => {
     });
     expect(harness.paymentProofs.registerPaymentProof).not.toHaveBeenCalled();
     expect(harness.turns.processTurn).not.toHaveBeenCalled();
-    expect(harness.executor.execute).not.toHaveBeenCalled();
+    expect(harness.deliveries.createFromActions).not.toHaveBeenCalled();
+    expect(harness.deliveries.executePendingForInbound).not.toHaveBeenCalled();
   });
 
   it('does not answer text while payment is already under review when engine says no automation', async () => {
@@ -232,9 +250,9 @@ describe('IpdeWhatsappOrchestratorService', () => {
       textInput({ id: 'wamid.text-2' }),
     );
 
-    expect(harness.executor.execute).not.toHaveBeenCalled();
+    expect(harness.deliveries.createFromActions).not.toHaveBeenCalled();
     expect(
-      harness.outboundPersistence.persistExecutedMessages,
+      harness.outboundPersistence.persistDeliveredMessages,
     ).not.toHaveBeenCalled();
   });
 });
@@ -281,11 +299,14 @@ function createHarness(overrides: HarnessOverrides = {}) {
   const turns = {
     processTurn: jest.fn().mockResolvedValue(overrides.turn ?? defaultTurn()),
   };
-  const executor = {
-    execute: jest.fn().mockResolvedValue(defaultExecution()),
+  const deliveries = {
+    createFromActions: jest.fn().mockResolvedValue([]),
+    executePendingForInbound: jest
+      .fn()
+      .mockResolvedValue(defaultDeliveryExecution()),
   };
   const outboundPersistence = {
-    persistExecutedMessages: jest.fn().mockResolvedValue(1),
+    persistDeliveredMessages: jest.fn().mockResolvedValue(1),
   };
   const paymentProofs = {
     registerPaymentProof: jest
@@ -312,7 +333,7 @@ function createHarness(overrides: HarnessOverrides = {}) {
     conversations as unknown as ConversationsService,
     usage as unknown as UsageService,
     turns as unknown as IpdeConversationTurnService,
-    executor as unknown as IpdeOutboundActionExecutorService,
+    deliveries as unknown as IpdeOutboundDeliveryService,
     outboundPersistence as unknown as IpdeWhatsappOutboundPersistenceService,
     paymentProofs as unknown as IpdePaymentProofService,
     paymentProofDetector as unknown as IpdePaymentProofDetectorService,
@@ -326,7 +347,7 @@ function createHarness(overrides: HarnessOverrides = {}) {
     conversations,
     usage,
     turns,
-    executor,
+    deliveries,
     outboundPersistence,
     paymentProofs,
     paymentProofDetector,
@@ -459,21 +480,14 @@ function turnWithNoAutomatedResponse(): IpdeConversationTurnResult {
   };
 }
 
-function defaultExecution(): IpdeOutboundExecutionResult {
+function defaultDeliveryExecution(): IpdeOutboundDeliveryExecutionResult {
   return {
     attempted: true,
-    simulated: true,
-    actionResults: [
-      {
-        actionType: 'ASK_SUBJECT',
-        sequence: 1,
-        attempted: false,
-        success: true,
-        simulated: true,
-        providerMessageId: null,
-        errorCode: null,
-      },
-    ],
+    sent: 1,
+    failed: 0,
+    pending: 0,
+    skipped: 0,
+    deliveries: [],
   };
 }
 

@@ -91,6 +91,15 @@ enum IpdePaymentProofStatus {
   IGNORED
 }
 
+enum IpdeOutboundDeliveryStatus {
+  PENDING
+  SENDING
+  SENT
+  FAILED
+  CANCELLED
+  SKIPPED
+}
+
 enum IpdeSubjectRequestStatus {
   REQUESTED
   LIST_PRESENTED
@@ -122,6 +131,7 @@ model Tenant {
   ipdeConversationStates IpdeConversationState[]
   ipdeOrders             IpdeOrder[]
   ipdePaymentProofs      IpdePaymentProof[]
+  ipdeOutboundDeliveries IpdeOutboundDelivery[]
   ipdeSubjectRequests    IpdeSubjectRequest[]
   ipdeOrderItems         IpdeOrderItem[]
 
@@ -160,6 +170,7 @@ model Lead {
 
   ipdeConversationStates IpdeConversationState[]
   ipdePaymentProofs      IpdePaymentProof[]
+  ipdeOutboundDeliveries IpdeOutboundDelivery[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -178,8 +189,9 @@ model Conversation {
   lead     Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
   messages Message[]
 
-  ipdeConversationState IpdeConversationState?
-  ipdePaymentProofs     IpdePaymentProof[]
+  ipdeConversationState  IpdeConversationState?
+  ipdePaymentProofs      IpdePaymentProof[]
+  ipdeOutboundDeliveries IpdeOutboundDelivery[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -362,6 +374,39 @@ model IpdePaymentProof {
   @@index([providerMediaId])
   @@index([tenantId, providerMediaId])
   @@index([conversationId, receivedAt])
+}
+
+model IpdeOutboundDelivery {
+  id                String                     @id @default(uuid())
+  tenantId          String
+  conversationId    String
+  leadId            String?
+  orderId           String?
+  inboundMessageId  String?
+  inboundExternalId String
+  actionType        String
+  sequence          Int
+  payloadJson       Json
+  status            IpdeOutboundDeliveryStatus @default(PENDING)
+  attemptCount      Int                        @default(0)
+  maxAttempts       Int                        @default(3)
+  providerMessageId String?
+  lastErrorCode     String?
+  lastErrorMessage  String?
+  scheduledAt       DateTime                   @default(now())
+  sentAt            DateTime?
+  failedAt          DateTime?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, inboundExternalId, sequence])
+  @@index([tenantId, status, scheduledAt])
+  @@index([conversationId, createdAt])
+  @@index([inboundExternalId])
 }
 
 model IpdeSubjectRequest {

@@ -2,12 +2,16 @@ import { Body, Controller, Get, Post, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 import { WhatsappService } from './whatsapp.service';
+import { WhatsappSignatureService } from './security/whatsapp-signature.service';
+
+type RequestWithRawBody = Request & { rawBody?: Buffer };
 
 @Controller('webhooks/whatsapp')
 export class WhatsappController {
   constructor(
     private readonly configService: ConfigService,
     private readonly whatsappService: WhatsappService,
+    private readonly signatureService: WhatsappSignatureService,
   ) {}
 
   /**
@@ -44,12 +48,24 @@ export class WhatsappController {
    * - cambios relacionados con la cuenta
    */
   @Post()
-  async receiveMessage(@Body() body: any) {
+  async receiveMessage(
+    @Req() req: RequestWithRawBody,
+    @Body() body: any,
+    @Res() res: Response,
+  ) {
+    const signature = this.signatureService.validate({
+      signatureHeader: req.headers['x-hub-signature-256'],
+      rawBody: req.rawBody,
+    });
+    if (!signature.ok) {
+      return res.sendStatus(403);
+    }
+
     const result = await this.whatsappService.handleIncomingWebhook(body);
 
-    return {
+    return res.status(200).send({
       received: true,
       result,
-    };
+    });
   }
 }

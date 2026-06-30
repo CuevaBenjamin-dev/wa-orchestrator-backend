@@ -9,8 +9,8 @@ import { IpdeConversationTurnService } from '../conversation-engine/ipde-convers
 import { IpdeOutboundAction } from '../conversation-engine/ipde-conversation-action.schemas';
 import { IpdeOrderService } from '../services/ipde-order.service';
 import { IpdeConversationStateService } from '../services/ipde-conversation-state.service';
-import { IpdeOutboundActionExecutorService } from '../outbound/ipde-outbound-action-executor.service';
-import { IpdeOutboundExecutionResult } from '../outbound/ipde-outbound-action-executor.types';
+import { IpdeOutboundDeliveryService } from '../outbound-delivery/ipde-outbound-delivery.service';
+import { IpdeOutboundDeliveryExecutionResult } from '../outbound-delivery/ipde-outbound-delivery.types';
 import { IpdePaymentProofDetectorService } from '../payment-proof/ipde-payment-proof-detector.service';
 import { IpdePaymentProofService } from '../payment-proof/ipde-payment-proof.service';
 import { IpdeWhatsappMessageMapperService } from './ipde-whatsapp-message-mapper.service';
@@ -33,7 +33,7 @@ export class IpdeWhatsappOrchestratorService {
     private readonly conversations: ConversationsService,
     private readonly usage: UsageService,
     private readonly turns: IpdeConversationTurnService,
-    private readonly executor: IpdeOutboundActionExecutorService,
+    private readonly deliveries: IpdeOutboundDeliveryService,
     private readonly outboundPersistence: IpdeWhatsappOutboundPersistenceService,
     private readonly paymentProofs: IpdePaymentProofService,
     private readonly paymentProofDetector: IpdePaymentProofDetectorService,
@@ -75,7 +75,21 @@ export class IpdeWhatsappOrchestratorService {
 
       const duplicate = await this.conversations.findByExternalId(externalId);
       if (duplicate) {
-        return { status: 'duplicated_message_ignored', externalId };
+        const from = this.mapper.getSender(input.message);
+        if (!from) {
+          return { status: 'duplicated_message_ignored', externalId };
+        }
+        const outboundExecution = await this.executePendingOutboxForInbound({
+          tenant,
+          phoneNumberId,
+          from,
+          inboundExternalId: externalId,
+        });
+        return {
+          status: 'duplicated_message_ignored',
+          externalId,
+          outboundExecution,
+        };
       }
 
       const type = this.mapper.getMessageType(input.message);
@@ -159,6 +173,8 @@ export class IpdeWhatsappOrchestratorService {
 
     const outboundExecution = await this.executeAndPersistOutbound({
       context,
+      inboundMessageId: context.inboundMessageId,
+      orderId: turn.order.orderId,
       actions: turn.outboundActions,
     });
 
@@ -229,6 +245,8 @@ export class IpdeWhatsappOrchestratorService {
     });
     const outboundExecution = await this.executeAndPersistOutbound({
       context,
+      inboundMessageId: context.inboundMessageId,
+      orderId: proof.order.orderId,
       actions: proof.outboundActions,
     });
 
@@ -330,25 +348,54 @@ export class IpdeWhatsappOrchestratorService {
 
   private async executeAndPersistOutbound(params: {
     context: IpdeWhatsappMessageContext;
+    inboundMessageId: string;
+    orderId?: string | null;
     actions: IpdeOutboundAction[];
-  }): Promise<IpdeOutboundExecutionResult | null> {
+  }): Promise<IpdeOutboundDeliveryExecutionResult | null> {
     if (!params.actions.some(shouldExecuteAction)) {
       return null;
     }
 
-    const execution = await this.executor.execute({
+    await this.deliveries.createFromActions({
+      tenantId: params.context.tenantId,
+      leadId: params.context.leadId,
+      conversationId: params.context.conversationId,
+      orderId: params.orderId ?? undefined,
+      inboundMessageId: params.inboundMessageId,
+      inboundExternalId: params.context.providerMessageId,
+      actions: params.actions,
+    });
+
+    const execution = await this.deliveries.executePendingForInbound({
       tenantCode: IPDE_TENANT_CODE,
       tenantId: params.context.tenantId,
       phoneNumberId: params.context.phoneNumberId,
       to: params.context.from,
-      actions: params.actions,
+      inboundExternalId: params.context.providerMessageId,
     });
-    await this.outboundPersistence.persistExecutedMessages({
-      conversationId: params.context.conversationId,
-      actions: params.actions,
-      execution,
+    await this.outboundPersistence.persistDeliveredMessages({
+      deliveries: execution.deliveries,
     });
     return execution;
+  }
+
+  private async executePendingOutboxForInbound(params: {
+    tenant: IpdeWhatsappTenant;
+    phoneNumberId: string;
+    from: string;
+    inboundExternalId: string;
+  }): Promise<IpdeOutboundDeliveryExecutionResult | null> {
+    const execution = await this.deliveries.executePendingForInbound({
+      tenantCode: IPDE_TENANT_CODE,
+      tenantId: params.tenant.id,
+      phoneNumberId: params.phoneNumberId,
+      to: params.from,
+      inboundExternalId: params.inboundExternalId,
+    });
+    await this.outboundPersistence.persistDeliveredMessages({
+      deliveries: execution.deliveries,
+    });
+    return execution.deliveries.length > 0 ? execution : null;
   }
 
   private async recordIpdeAiUsage(

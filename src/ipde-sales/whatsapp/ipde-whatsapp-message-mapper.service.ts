@@ -80,6 +80,10 @@ export class IpdeWhatsappMessageMapperService {
     return asNonEmptyString(asRecord(message)?.type) ?? null;
   }
 
+  getSender(message: unknown): string | null {
+    return asNonEmptyString(asRecord(message)?.from) ?? null;
+  }
+
   contactNameFor(contacts: unknown, waId: string): string | undefined {
     if (!Array.isArray(contacts)) return undefined;
     const contact = contacts

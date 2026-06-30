@@ -3,6 +3,7 @@ import { IpdeOutboundAction } from '../conversation-engine/ipde-conversation-act
 import { IpdeConversationTurnResult } from '../conversation-engine/ipde-conversation-turn.schemas';
 import { IpdePaymentProofDetectionResult } from '../payment-proof/ipde-payment-proof.types';
 import { IpdeOutboundExecutionResult } from '../outbound/ipde-outbound-action-executor.types';
+import { IpdeOutboundDeliveryExecutionResult } from '../outbound-delivery/ipde-outbound-delivery.types';
 
 export type IpdeWhatsappTenant = Tenant & { agentConfig?: AgentConfig | null };
 
@@ -44,7 +45,7 @@ export type IpdeWhatsappMessageResult =
       conversationId: string;
       from: string;
       turn: IpdeConversationTurnResult;
-      outboundExecution: IpdeOutboundExecutionResult | null;
+      outboundExecution: IpdeOutboundDeliveryExecutionResult | null;
     }
   | {
       status: 'ipde_payment_proof_processed';
@@ -53,7 +54,7 @@ export type IpdeWhatsappMessageResult =
       conversationId: string;
       from: string;
       detection: IpdePaymentProofDetectionResult;
-      outboundExecution: IpdeOutboundExecutionResult | null;
+      outboundExecution: IpdeOutboundDeliveryExecutionResult | null;
     }
   | {
       status: 'ipde_media_ignored';
@@ -67,6 +68,7 @@ export type IpdeWhatsappMessageResult =
   | {
       status: 'duplicated_message_ignored';
       externalId: string;
+      outboundExecution?: IpdeOutboundDeliveryExecutionResult | null;
     }
   | {
       status: 'ignored_empty_message';

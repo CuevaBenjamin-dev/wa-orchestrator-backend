@@ -21,7 +21,8 @@
     "catalog:validate": "ts-node --transpile-only scripts/validate-ipde-catalog.ts",
     "ipde:config:validate": "ts-node --transpile-only scripts/validate-ipde-commercial-config.ts",
     "ipde:pricing:validate": "ts-node --transpile-only scripts/validate-ipde-pricing.ts",
-    "ipde:media:validate": "ts-node --transpile-only scripts/validate-ipde-media.ts"
+    "ipde:media:validate": "ts-node --transpile-only scripts/validate-ipde-media.ts",
+    "ipde:env:validate": "ts-node --transpile-only scripts/validate-ipde-env.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
